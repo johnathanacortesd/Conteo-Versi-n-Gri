@@ -7,12 +7,15 @@ import io
 import re
 import html
 import numpy as np
+from pathlib import Path
 
 st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
 
 # ==============================================================================
 # FUNCIONES AUXILIARES
 # ==============================================================================
+
+CONFIG_PATH = Path(__file__).parent / "Configuracion.xlsx"
 
 def extract_link_from_cell(cell):
     if cell.hyperlink and cell.hyperlink.target:
@@ -47,7 +50,8 @@ def convert_html_entities(text):
     text = re.sub(r'&#x([0-9A-Fa-f]+);', replace_hex_entity, text)
     text = re.sub(r'&#(\d+);', replace_decimal_entity, text)
 
-    for bad, good in {'\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'", 'Â': '', 'â': '', '€': '', '™': ''}.items():
+    for bad, good in {'\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",
+                      'Â': '', 'â': '', '€': '', '™': ''}.items():
         text = text.replace(bad, good)
     return text
 
@@ -114,56 +118,43 @@ def to_excel_from_df(df, final_order):
     output.seek(0)
     return output.getvalue()
 
+def load_config(config_source):
+    """Carga region_map e internet_map desde archivo (ruta o file-like)."""
+    config_sheets = pd.read_excel(config_source, sheet_name=None, engine='openpyxl')
+    region_map = pd.Series(
+        config_sheets['Regiones'].iloc[:, 1].values,
+        index=config_sheets['Regiones'].iloc[:, 0].astype(str).str.lower().str.strip()
+    ).to_dict()
+    internet_map = pd.Series(
+        config_sheets['Internet'].iloc[:, 1].values,
+        index=config_sheets['Internet'].iloc[:, 0].astype(str).str.lower().str.strip()
+    ).to_dict()
+    return region_map, internet_map
+
 # ==============================================================================
-# PROCESAMIENTO
+# PROCESAMIENTO DE UN SOLO DOSSIER
 # ==============================================================================
 
-def run_process(dossier_file, config_file):
-    progress = st.empty()
-
-    # Paso 1: config
-    progress.info("Paso 1/4: Cargando configuración...")
-    try:
-        config_sheets = pd.read_excel(config_file, sheet_name=None, engine='openpyxl')
-        region_map = pd.Series(
-            config_sheets['Regiones'].iloc[:, 1].values,
-            index=config_sheets['Regiones'].iloc[:, 0].astype(str).str.lower().str.strip()
-        ).to_dict()
-        internet_map = pd.Series(
-            config_sheets['Internet'].iloc[:, 1].values,
-            index=config_sheets['Internet'].iloc[:, 0].astype(str).str.lower().str.strip()
-        ).to_dict()
-    except Exception as e:
-        st.error(f"Error en Configuracion.xlsx: {e}. Debe tener hojas 'Regiones' e 'Internet'.")
-        return False
-
-    # Paso 2: leer dossier
-    progress.info("Paso 2/4: Leyendo archivo de entrada...")
-    try:
-        wb = load_workbook(dossier_file)
-        sheet = wb.active
-        headers = [cell.value for cell in sheet[1] if cell.value is not None]
-        rows = []
-        for row in sheet.iter_rows(min_row=2):
-            if all(c.value is None for c in row):
-                continue
-            row_data = dict(zip(headers, [c.value for c in row[:len(headers)]]))
-            for lc in ['URL Nota AV', 'URL (Streaming - Imagen)', 'URL Nota', 'Link Nota AV', 'Link (Streaming - Imagen)']:
-                if lc in headers:
-                    idx = headers.index(lc)
-                    if idx < len(row):
-                        ext = extract_link_from_cell(row[idx])
-                        if ext:
-                            row_data[lc] = ext
-            rows.append(row_data)
-    except Exception as e:
-        st.error(f"Error leyendo el Dossier: {e}")
-        return False
+def process_dossier(dossier_file, region_map, internet_map):
+    """Procesa un archivo dossier y retorna (df_procesado, av_count, grafica_count)."""
+    wb = load_workbook(dossier_file)
+    sheet = wb.active
+    headers = [cell.value for cell in sheet[1] if cell.value is not None]
+    rows = []
+    for row in sheet.iter_rows(min_row=2):
+        if all(c.value is None for c in row):
+            continue
+        row_data = dict(zip(headers, [c.value for c in row[:len(headers)]]))
+        for lc in ['URL Nota AV', 'URL (Streaming - Imagen)', 'URL Nota', 'Link Nota AV', 'Link (Streaming - Imagen)']:
+            if lc in headers:
+                idx = headers.index(lc)
+                if idx < len(row):
+                    ext = extract_link_from_cell(row[idx])
+                    if ext:
+                        row_data[lc] = ext
+        rows.append(row_data)
 
     df = pd.DataFrame(rows)
-
-    # Paso 3: transformaciones
-    progress.info("Paso 3/4: Aplicando transformaciones...")
 
     tipo_medio_map = {
         'online': 'Internet', 'internet': 'Internet',
@@ -180,9 +171,9 @@ def run_process(dossier_file, config_file):
 
     is_av = df['Tipo de Medio'].isin(['Radio', 'Televisión'])
     is_grafica = df['Tipo de Medio'].isin(['Prensa', 'Internet', 'Revistas'])
-
-    # Buscarv Internet: reemplazar Medio cuando Tipo de Medio es Internet
     is_internet = df['Tipo de Medio'] == 'Internet'
+
+    # Buscarv Internet en columna Medio
     df.loc[is_internet, 'Medio'] = (
         df.loc[is_internet, 'Medio']
         .astype(str).str.lower().str.strip()
@@ -190,7 +181,7 @@ def run_process(dossier_file, config_file):
         .fillna(df.loc[is_internet, 'Medio'])
     )
 
-    # Buscarv Región desde hoja Regiones
+    # Buscarv Región
     df['Región'] = df['Medio'].astype(str).str.lower().str.strip().map(region_map)
 
     df['ID Noticia'] = df.get('NoticiaId', pd.Series(dtype=str))
@@ -202,6 +193,7 @@ def run_process(dossier_file, config_file):
     df['Nro. Pagina'] = df.get('Nro. Pagina', pd.Series(dtype=str))
     df['Dimensión'] = df.get('Dimensioncm2', pd.Series(dtype=str))
     df['Duración - Nro. Caracteres'] = df.get('Duración - Nro. Caracteres', pd.Series(dtype=str))
+
     # AV: mover Duración a Dimensión y dejar Duración en 0
     df.loc[is_av, 'Dimensión'] = df.loc[is_av, 'Duración - Nro. Caracteres']
     df.loc[is_av, 'Duración - Nro. Caracteres'] = 0
@@ -254,8 +246,114 @@ def run_process(dossier_file, config_file):
     is_av_f = df['Tipo de Medio'].isin(['Radio', 'Televisión'])
     is_grafica_f = df['Tipo de Medio'].isin(['Prensa', 'Internet', 'Revistas'])
 
-    # Paso 4: generar Excel
-    progress.info("Paso 4/4: Generando Excel...")
+    return df, int(is_av_f.sum()), int(is_grafica_f.sum())
+
+# ==============================================================================
+# INTERFAZ
+# ==============================================================================
+
+st.title("🚀 Procesador SOV v2.0")
+st.markdown("Transforma archivos de entrada al formato estándar de salida con todos los mapeos aplicados.")
+
+# --- Configuración ---
+# Intentar cargar desde el repo; si no existe, pedir que se suba
+config_source = None
+config_label = ""
+
+if CONFIG_PATH.exists():
+    config_source = CONFIG_PATH
+    config_label = f"✅ Configuración cargada desde el repo: `Configuracion.xlsx`"
+    st.success(config_label)
+else:
+    st.warning("⚠️ No se encontró `Configuracion.xlsx` en el repositorio. Súbelo manualmente:")
+    config_upload = st.file_uploader("Subir Configuracion.xlsx", type=["xlsx"], key="config_upload")
+    if config_upload:
+        config_source = config_upload
+        st.success(f"✅ Configuración cargada: {config_upload.name}")
+
+with st.expander("📋 Ver mapeo de columnas aplicado"):
+    st.markdown("""
+| Columna Salida | Fuente |
+|---|---|
+| ID Noticia | NoticiaId |
+| Fecha | Fecha |
+| Hora | Hora |
+| Medio | Medio (Internet: reemplazado por hoja Internet) |
+| Tipo de Medio | Tipo de Medio (normalizado) |
+| Sección - Programa | Sección - Programa |
+| Región | Generada desde hoja Regiones en Configuracion.xlsx |
+| Título | Título |
+| Autor - Conductor | Autor - Conductor |
+| Nro. Pagina | Nro. Pagina |
+| Dimensión | Dimensioncm2 (Gráfica) / Duración - Nro. Caracteres (AV) |
+| Duración - Nro. Caracteres | Duración - Nro. Caracteres (Gráfica) / 0 (AV) |
+| CPE | CPE (AV) / Valor de Nota (Gráfica) |
+| Tier | Tier |
+| Audiencia | Audiencia |
+| Tono | Tono |
+| Tema | Tematica |
+| Temas Generales - Tema | Temas Generales - Tema |
+| Resumen - Aclaracion | CuerpoEs |
+| Link Nota | URL Nota AV con .ar→.co (AV) / URL (Streaming - Imagen) (Gráfica) |
+| Link (Streaming - Imagen) | URL Nota |
+| Menciones - Empresa | Menciones - Empresa (AV) / Empresa rel. (Gráfica) — expandido por ; |
+""")
+
+st.markdown("---")
+
+# --- Uploader de dossiers (múltiples) ---
+st.subheader("📂 Archivos a procesar")
+uploaded_dossiers = st.file_uploader(
+    "Sube uno o varios archivos Dossier (.xlsx)",
+    type=["xlsx"],
+    accept_multiple_files=True,
+    key="dossiers"
+)
+
+if uploaded_dossiers:
+    nombres = [f.name for f in uploaded_dossiers]
+    st.info(f"{len(uploaded_dossiers)} archivo(s) cargado(s): {', '.join(nombres)}")
+
+# --- Resultados previos persistentes ---
+if st.session_state.get('resultados'):
+    st.markdown("---")
+    st.subheader("📊 Conteos por archivo")
+
+    resultados = st.session_state['resultados']
+    nombres = [r['nombre'] for r in resultados]
+
+    seleccionados = st.multiselect(
+        "Selecciona los archivos que quieres descargar:",
+        options=nombres,
+        default=nombres
+    )
+
+    for r in resultados:
+        with st.container():
+            st.markdown(f"**{r['nombre']}**")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🗞️ Gráficas", r['graficas'])
+            col2.metric("🎬 AV", r['av'])
+            col3.metric("Total filas", r['total'])
+            if r['nombre'] in seleccionados:
+                st.download_button(
+                    label=f"📥 Descargar {r['nombre']}",
+                    data=r['excel'],
+                    file_name=r['filename'],
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_{r['nombre']}"
+                )
+        st.markdown("---")
+
+# --- Botón principal ---
+can_run = bool(uploaded_dossiers and config_source)
+
+if st.button("▶️ Iniciar Proceso", disabled=not can_run, type="primary"):
+    try:
+        region_map, internet_map = load_config(config_source)
+    except Exception as e:
+        st.error(f"Error cargando Configuracion.xlsx: {e}. Debe tener hojas 'Regiones' e 'Internet'.")
+        st.stop()
 
     final_order = [
         "ID Noticia", "Fecha", "Hora", "Medio", "Tipo de Medio",
@@ -266,105 +364,26 @@ def run_process(dossier_file, config_file):
         "Link Nota", "Link (Streaming - Imagen)", "Menciones - Empresa"
     ]
 
-    excel_data = to_excel_from_df(df, final_order)
+    resultados = []
+    progress_bar = st.progress(0)
 
-    st.session_state['resultado_listo'] = True
-    st.session_state['excel_data'] = excel_data
-    st.session_state['filename'] = f"SOV_Procesado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    st.session_state['grafica_count'] = int(is_grafica_f.sum())
-    st.session_state['av_count'] = int(is_av_f.sum())
-    st.session_state['total_count'] = len(df)
+    for i, dossier_file in enumerate(uploaded_dossiers):
+        with st.spinner(f"Procesando {dossier_file.name}..."):
+            try:
+                df, av_count, grafica_count = process_dossier(dossier_file, region_map, internet_map)
+                excel_data = to_excel_from_df(df, final_order)
+                resultados.append({
+                    'nombre': dossier_file.name,
+                    'graficas': grafica_count,
+                    'av': av_count,
+                    'total': len(df),
+                    'excel': excel_data,
+                    'filename': f"SOV_{dossier_file.name.replace('.xlsx','')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                })
+            except Exception as e:
+                st.error(f"Error procesando {dossier_file.name}: {e}")
+        progress_bar.progress((i + 1) / len(uploaded_dossiers))
 
-    progress.success("¡Proceso completado!")
+    st.session_state['resultados'] = resultados
     st.balloons()
-    return True
-
-# ==============================================================================
-# INTERFAZ
-# ==============================================================================
-
-st.title("🚀 Procesador SOV v2.0")
-st.markdown("Transforma el archivo de entrada al formato estándar de salida con todos los mapeos aplicados.")
-
-st.info(
-    "**Instrucciones:**\n\n"
-    "1. Sube el archivo Dossier de entrada y el archivo `Configuracion.xlsx`.\n"
-    "2. El archivo de configuración debe tener una hoja **Regiones** (col A = Medio, col B = Región).\n"
-    "3. Haz clic en **Iniciar Proceso** y descarga el resultado."
-)
-
-with st.expander("📋 Ver mapeo de columnas aplicado"):
-    st.markdown("""
-| Columna Salida | Fuente |
-|---|---|
-| ID Noticia | NoticiaId |
-| Fecha | Fecha |
-| Hora | Hora |
-| Medio | Medio |
-| Tipo de Medio | Tipo de Medio (normalizado) |
-| Sección - Programa | Sección - Programa |
-| Región | Generada desde hoja Regiones en Configuracion.xlsx |
-| Título | Título |
-| Autor - Conductor | Autor - Conductor |
-| Nro. Pagina | Nro. Pagina |
-| Dimensión | Dimensioncm2 |
-| Duración - Nro. Caracteres | Duración - Nro. Caracteres |
-| CPE | CPE (AV) / Valor de Nota (Gráfica) |
-| Tier | Tier |
-| Audiencia | Audiencia |
-| Tono | Tono |
-| Tema | Tematica |
-| Temas Generales - Tema | Temas Generales - Tema |
-| Resumen - Aclaracion | CuerpoEs |
-| Link Nota | URL Nota AV (AV) / URL (Streaming - Imagen) (Gráfica) |
-| Link (Streaming - Imagen) | URL Nota |
-| Menciones - Empresa | Menciones - Empresa (AV) / Empresa rel. (Gráfica) — se expande por ; |
-""")
-
-# Uploader
-uploaded_files = st.file_uploader(
-    "Sube aquí el Dossier y el archivo Configuracion.xlsx",
-    type=["xlsx"],
-    accept_multiple_files=True
-)
-
-dossier_file, config_file = None, None
-
-if uploaded_files:
-    for file in uploaded_files:
-        if 'config' in file.name.lower():
-            config_file = file
-        else:
-            dossier_file = file
-    if dossier_file:
-        st.success(f"✅ Dossier: {dossier_file.name}")
-    else:
-        st.warning("⚠️ No se detectó el archivo Dossier.")
-    if config_file:
-        st.success(f"✅ Configuración: {config_file.name}")
-    else:
-        st.warning("⚠️ No se detectó el archivo Configuracion.xlsx.")
-
-# Conteos y descarga — aparecen aquí, debajo del uploader, y persisten
-if st.session_state.get('resultado_listo'):
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🗞️ Gráficas", st.session_state['grafica_count'])
-    col2.metric("🎬 AV", st.session_state['av_count'])
-    col3.metric("Total filas", st.session_state['total_count'])
-    st.download_button(
-        label="📥 Descargar Resultado",
-        data=st.session_state['excel_data'],
-        file_name=st.session_state['filename'],
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    st.markdown("---")
-
-# Botón de proceso
-if st.button(
-    "▶️ Iniciar Proceso",
-    disabled=not (dossier_file and config_file),
-    type="primary"
-):
-    run_process(dossier_file, config_file)
     st.rerun()
