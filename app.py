@@ -202,6 +202,9 @@ def run_process(dossier_file, config_file):
     df['Nro. Pagina'] = df.get('Nro. Pagina', pd.Series(dtype=str))
     df['Dimensión'] = df.get('Dimensioncm2', pd.Series(dtype=str))
     df['Duración - Nro. Caracteres'] = df.get('Duración - Nro. Caracteres', pd.Series(dtype=str))
+    # AV: mover Duración a Dimensión y dejar Duración en 0
+    df.loc[is_av, 'Dimensión'] = df.loc[is_av, 'Duración - Nro. Caracteres']
+    df.loc[is_av, 'Duración - Nro. Caracteres'] = 0
 
     cpe_av = df.get('CPE', pd.Series([np.nan] * len(df)))
     cpe_grafica = df.get('Valor de Nota', pd.Series([np.nan] * len(df)))
