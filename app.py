@@ -129,8 +129,12 @@ def run_process(dossier_file, config_file):
             config_sheets['Regiones'].iloc[:, 1].values,
             index=config_sheets['Regiones'].iloc[:, 0].astype(str).str.lower().str.strip()
         ).to_dict()
+        internet_map = pd.Series(
+            config_sheets['Internet'].iloc[:, 1].values,
+            index=config_sheets['Internet'].iloc[:, 0].astype(str).str.lower().str.strip()
+        ).to_dict()
     except Exception as e:
-        st.error(f"Error en Configuracion.xlsx: {e}")
+        st.error(f"Error en Configuracion.xlsx: {e}. Debe tener hojas 'Regiones' e 'Internet'.")
         return False
 
     # Paso 2: leer dossier
@@ -162,9 +166,10 @@ def run_process(dossier_file, config_file):
     progress.info("Paso 3/4: Aplicando transformaciones...")
 
     tipo_medio_map = {
-        'online': 'Internet', 'diario': 'Diario',
-        'am': 'Radio AM', 'fm': 'Radio FM',
-        'aire': 'Televisión Aire', 'cable': 'Televisión Cable',
+        'online': 'Internet', 'internet': 'Internet',
+        'diario': 'Prensa',
+        'am': 'Radio', 'fm': 'Radio',
+        'aire': 'Televisión', 'cable': 'Televisión',
         'revista': 'Revistas', 'revistas': 'Revistas',
     }
     df['Tipo de Medio'] = (
@@ -173,15 +178,25 @@ def run_process(dossier_file, config_file):
         .fillna(df['Tipo de Medio'].astype(str).str.strip())
     )
 
-    is_av = df['Tipo de Medio'].isin(['Radio AM', 'Radio FM', 'Televisión Aire', 'Televisión Cable'])
-    is_grafica = df['Tipo de Medio'].isin(['Diario', 'Internet', 'Revistas'])
+    is_av = df['Tipo de Medio'].isin(['Radio', 'Televisión'])
+    is_grafica = df['Tipo de Medio'].isin(['Prensa', 'Internet', 'Revistas'])
+
+    # Buscarv Internet: reemplazar Medio cuando Tipo de Medio es Internet
+    is_internet = df['Tipo de Medio'] == 'Internet'
+    df.loc[is_internet, 'Medio'] = (
+        df.loc[is_internet, 'Medio']
+        .astype(str).str.lower().str.strip()
+        .map(internet_map)
+        .fillna(df.loc[is_internet, 'Medio'])
+    )
+
+    # Buscarv Región desde hoja Regiones
+    df['Región'] = df['Medio'].astype(str).str.lower().str.strip().map(region_map)
 
     df['ID Noticia'] = df.get('NoticiaId', pd.Series(dtype=str))
     df['Fecha'] = pd.to_datetime(df.get('Fecha', pd.Series(dtype=str)), dayfirst=True, errors='coerce').dt.normalize()
     df['Hora'] = df.get('Hora', pd.Series(dtype=str))
-    df['Medio'] = df.get('Medio', pd.Series(dtype=str)).astype(str).apply(clean_text)
     df['Sección - Programa'] = df.get('Sección - Programa', pd.Series(dtype=str)).astype(str).apply(clean_text)
-    df['Región'] = df['Medio'].str.lower().str.strip().map(region_map)
     df['Título'] = df.get('Título', pd.Series(dtype=str)).astype(str).apply(clean_text)
     df['Autor - Conductor'] = df.get('Autor - Conductor', pd.Series(dtype=str)).astype(str).apply(clean_text)
     df['Nro. Pagina'] = df.get('Nro. Pagina', pd.Series(dtype=str))
@@ -232,8 +247,8 @@ def run_process(dossier_file, config_file):
                 rows_expanded.append(new_row)
     df = pd.DataFrame(rows_expanded).reset_index(drop=True)
 
-    is_av_f = df['Tipo de Medio'].isin(['Radio AM', 'Radio FM', 'Televisión Aire', 'Televisión Cable'])
-    is_grafica_f = df['Tipo de Medio'].isin(['Diario', 'Internet', 'Revistas'])
+    is_av_f = df['Tipo de Medio'].isin(['Radio', 'Televisión'])
+    is_grafica_f = df['Tipo de Medio'].isin(['Prensa', 'Internet', 'Revistas'])
 
     # Paso 4: generar Excel
     progress.info("Paso 4/4: Generando Excel...")
