@@ -62,13 +62,10 @@ def clean_text(text):
     return convert_html_entities(text).strip()
 
 def clean_cuerpo(text):
-    """Limpia el campo CuerpoEs conservando saltos de línea."""
     if not isinstance(text, str) or text.strip() == '':
         return text
     text = convert_html_entities(text)
-    # Reemplazar etiquetas <br> por salto de línea real
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-    # Quitar otras etiquetas HTML residuales
     text = re.sub(r'<[^>]+>', '', text)
     return text.strip()
 
@@ -77,7 +74,6 @@ def to_excel_from_df(df, final_order):
     final_columns_in_df = [col for col in final_order if col in df.columns]
     df_to_excel = df[final_columns_in_df].copy()
 
-    # Convertir PyArrow strings a object
     for col in df_to_excel.columns:
         if hasattr(df_to_excel[col].dtype, 'pyarrow_dtype'):
             df_to_excel[col] = df_to_excel[col].astype(object)
@@ -86,7 +82,6 @@ def to_excel_from_df(df, final_order):
     ws = wb.active
     ws.title = 'Resultado'
 
-    # Encabezados en negrita
     for col_idx, col_name in enumerate(df_to_excel.columns, start=1):
         cell = ws.cell(row=1, column=col_idx, value=col_name)
         cell.font = Font(bold=True)
@@ -112,7 +107,6 @@ def to_excel_from_df(df, final_order):
             else:
                 cell.value = value if pd.notna(value) else None
 
-    # Anchos de columna
     for col_idx, col_name in enumerate(df_to_excel.columns, start=1):
         col_letter = ws.cell(row=1, column=col_idx).column_letter
         if col_name in ['Título', 'Resumen - Aclaracion']:
@@ -160,7 +154,6 @@ def run_process(dossier_file, config_file):
             row_values = [c.value for c in row[:len(headers)]]
             row_data = dict(zip(headers, row_values))
 
-            # Extraer hipervínculos donde existan
             for link_col_name in ['URL Nota AV', 'URL (Streaming - Imagen)', 'URL Nota', 'Link Nota AV', 'Link (Streaming - Imagen)']:
                 if link_col_name in headers:
                     idx = headers.index(link_col_name)
@@ -179,7 +172,6 @@ def run_process(dossier_file, config_file):
     # --- Paso 3: Transformaciones ---
     progress_text.info("Paso 3/4: Aplicando transformaciones y mapeos...")
 
-    # Normalizar Tipo de Medio
     tipo_medio_map = {
         'online': 'Internet',
         'diario': 'Diario',
@@ -192,105 +184,78 @@ def run_process(dossier_file, config_file):
     }
     df['Tipo de Medio'] = df['Tipo de Medio'].astype(str).str.lower().str.strip().map(tipo_medio_map).fillna(df['Tipo de Medio'].astype(str).str.strip())
 
-    # Clasificar tipo para lógica condicional
     is_av = df['Tipo de Medio'].isin(['Radio AM', 'Radio FM', 'Televisión Aire', 'Televisión Cable'])
     is_grafica = df['Tipo de Medio'].isin(['Diario', 'Internet', 'Revistas'])
 
-    # --- Mapeo de columnas al esquema de salida ---
-
-    # ID Noticia
     df['ID Noticia'] = df.get('NoticiaId', pd.Series(dtype=str))
-
-    # Fecha
     df['Fecha'] = pd.to_datetime(df.get('Fecha', pd.Series(dtype=str)), dayfirst=True, errors='coerce').dt.normalize()
-
-    # Hora
     df['Hora'] = df.get('Hora', pd.Series(dtype=str))
-
-    # Medio (sin cambio)
     df['Medio'] = df.get('Medio', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Sección - Programa
     df['Sección - Programa'] = df.get('Sección - Programa', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Región: mapear desde Medio
     df['Región'] = df['Medio'].str.lower().str.strip().map(region_map)
-
-    # Título
     df['Título'] = df.get('Título', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Autor - Conductor
     df['Autor - Conductor'] = df.get('Autor - Conductor', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Nro. Pagina
     df['Nro. Pagina'] = df.get('Nro. Pagina', pd.Series(dtype=str))
-
-    # Dimensión → Dimensioncm2
     df['Dimensión'] = df.get('Dimensioncm2', pd.Series(dtype=str))
-
-    # Duración - Nro. Caracteres
     df['Duración - Nro. Caracteres'] = df.get('Duración - Nro. Caracteres', pd.Series(dtype=str))
 
-    # CPE:
-    # - AV (AM, FM, Aire, Cable): columna CPE
-    # - Gráfica (Diario, Online, Revista): columna "Valor de Nota"
     cpe_av = df.get('CPE', pd.Series([np.nan] * len(df)))
     cpe_grafica = df.get('Valor de Nota', pd.Series([np.nan] * len(df)))
     df['CPE'] = np.where(is_av, cpe_av, np.where(is_grafica, cpe_grafica, np.nan))
 
-    # Tier
     df['Tier'] = df.get('Tier', pd.Series(dtype=str))
-
-    # Audiencia
     df['Audiencia'] = df.get('Audiencia', pd.Series(dtype=str))
-
-    # Tono
     df['Tono'] = df.get('Tono', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Tema → Tematica
     df['Tema'] = df.get('Tematica', pd.Series(dtype=str)).astype(str).apply(clean_text)
-
-    # Temas Generales - Tema
     df['Temas Generales - Tema'] = df.get('Temas Generales - Tema', pd.Series(dtype=str)).astype(str).apply(clean_text)
 
-    # Resumen - Aclaracion → CuerpoEs
-    # AV: mantener CuerpoEs tal cual (con saltos de línea)
-    # Gráfica: hacer doble salto de línea en el segundo párrafo si aplica
     cuerpo_raw = df.get('CuerpoEs', pd.Series([''] * len(df))).astype(str)
     cuerpo_cleaned = cuerpo_raw.apply(clean_cuerpo)
 
     def format_resumen_grafica(text):
         if not isinstance(text, str) or text.strip() == '':
             return text
-        # En gráfica: separar en párrafos con doble salto si hay varios
         parrafos = [p.strip() for p in text.split('\n') if p.strip()]
         return '\n\n'.join(parrafos) if len(parrafos) > 1 else text
 
-    resumen_av = cuerpo_cleaned
     resumen_grafica = cuerpo_cleaned.apply(format_resumen_grafica)
-    df['Resumen - Aclaracion'] = np.where(is_av, resumen_av, resumen_grafica)
+    df['Resumen - Aclaracion'] = np.where(is_av, cuerpo_cleaned, resumen_grafica)
 
-    # Link Nota:
-    # AV: URL Nota AV (o Link Nota AV)
-    # Gráfica: URL (Streaming - Imagen)
     url_nota_av = df.get('URL Nota AV', df.get('Link Nota AV', pd.Series([''] * len(df)))).fillna('').astype(str)
     url_streaming = df.get('URL (Streaming - Imagen)', pd.Series([''] * len(df))).fillna('').astype(str)
     df['Link Nota'] = np.where(is_av, url_nota_av, np.where(is_grafica, url_streaming, ''))
     df['Link Nota'] = df['Link Nota'].replace('', np.nan)
 
-    # Link (Streaming - Imagen):
-    # Ambos: URL Nota
     url_nota = df.get('URL Nota', pd.Series([''] * len(df))).fillna('').astype(str)
     df['Link (Streaming - Imagen)'] = url_nota.replace('', np.nan)
 
-    # Menciones - Empresa
-    df['Menciones - Empresa'] = df.get('Menciones - Empresa', pd.Series(dtype=str)).astype(str).apply(clean_text)
+    # Menciones - Empresa: AV → "Menciones - Empresa", Gráfica → "Empresa rel."
+    menciones_av = df.get('Menciones - Empresa', pd.Series([''] * len(df))).fillna('').astype(str).apply(clean_text)
+    menciones_grafica = df.get('Empresa rel.', pd.Series([''] * len(df))).fillna('').astype(str).apply(clean_text)
+    df['Menciones - Empresa'] = np.where(is_av, menciones_av, np.where(is_grafica, menciones_grafica, menciones_av))
 
-    # --- Paso 4: Conteo y salida ---
+    # --- Expansión de filas por Menciones - Empresa (separadas por ;) ---
+    rows_expanded = []
+    for _, row in df.iterrows():
+        menciones = [m.strip() for m in str(row['Menciones - Empresa']).split(';') if m.strip()]
+        if not menciones:
+            rows_expanded.append(row)
+        else:
+            for mencion in menciones:
+                new_row = row.copy()
+                new_row['Menciones - Empresa'] = mencion
+                rows_expanded.append(new_row)
+    df = pd.DataFrame(rows_expanded).reset_index(drop=True)
+
+    # Recalcular is_av / is_grafica sobre el df expandido para los conteos
+    is_av_exp = df['Tipo de Medio'].isin(['Radio AM', 'Radio FM', 'Televisión Aire', 'Televisión Cable'])
+    is_grafica_exp = df['Tipo de Medio'].isin(['Diario', 'Internet', 'Revistas'])
+
+    # --- Paso 4: Guardar resultados en session_state ---
     progress_text.info("Paso 4/4: Generando resultados...")
 
-    av_count = is_av.sum()
-    grafica_count = is_grafica.sum()
+    av_count = int(is_av_exp.sum())
+    grafica_count = int(is_grafica_exp.sum())
 
     final_order = [
         "ID Noticia", "Fecha", "Hora", "Medio", "Tipo de Medio",
@@ -301,22 +266,18 @@ def run_process(dossier_file, config_file):
         "Link Nota", "Link (Streaming - Imagen)", "Menciones - Empresa"
     ]
 
-    st.balloons()
-    progress_text.success("¡Proceso completado!")
-
-    st.subheader("📊 Resumen del Proceso")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total de filas", len(df))
-    col2.metric("🎬 AV (AM, FM, Aire, Cable)", int(av_count))
-    col3.metric("🗞️ Gráficas (Diario, Online, Revistas)", int(grafica_count))
-
     excel_data = to_excel_from_df(df, final_order)
-    st.download_button(
-        label="📥 Descargar Resultado",
-        data=excel_data,
-        file_name=f"SOV_Procesado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+
+    # Persistir en session_state para que sobrevivan al clic de descarga
+    st.session_state['resultado_listo'] = True
+    st.session_state['excel_data'] = excel_data
+    st.session_state['filename'] = f"SOV_Procesado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    st.session_state['total_count'] = len(df)
+    st.session_state['av_count'] = av_count
+    st.session_state['grafica_count'] = grafica_count
+
+    progress_text.success("¡Proceso completado!")
+    st.balloons()
 
 # ==============================================================================
 # INTERFAZ STREAMLIT
@@ -357,7 +318,7 @@ with st.expander("📋 Ver mapeo de columnas aplicado"):
 | Resumen - Aclaracion | CuerpoEs |
 | Link Nota | URL Nota AV (AV) / URL (Streaming - Imagen) (Gráfica) |
 | Link (Streaming - Imagen) | URL Nota |
-| Menciones - Empresa | Menciones - Empresa |
+| Menciones - Empresa | Menciones - Empresa (AV) / Empresa rel. (Gráfica) |
 """)
 
 uploaded_files = st.file_uploader(
@@ -384,6 +345,21 @@ if uploaded_files:
         st.success(f"✅ Configuración: {config_file.name}")
     else:
         st.warning("⚠️ No se detectó el archivo Configuracion.xlsx.")
+
+# Mostrar conteos si ya hay resultado (persiste aunque se haga clic en descargar)
+if st.session_state.get('resultado_listo'):
+    st.markdown("---")
+    st.subheader("📊 Resumen")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🗞️ Gráficas (Diario, Online, Revistas)", st.session_state['grafica_count'])
+    col2.metric("🎬 AV (AM, FM, Aire, Cable)", st.session_state['av_count'])
+    col3.metric("Total de filas", st.session_state['total_count'])
+    st.download_button(
+        label="📥 Descargar Resultado",
+        data=st.session_state['excel_data'],
+        file_name=st.session_state['filename'],
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 if st.button(
     "▶️ Iniciar Proceso",
