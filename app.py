@@ -225,7 +225,8 @@ def run_process(dossier_file, config_file):
 
     url_nota_av = df.get('URL Nota AV', df.get('Link Nota AV', pd.Series([''] * len(df)))).fillna('').astype(str)
     url_streaming = df.get('URL (Streaming - Imagen)', pd.Series([''] * len(df))).fillna('').astype(str)
-    df['Link Nota'] = np.where(is_av, url_nota_av, np.where(is_grafica, url_streaming, ''))
+    link_nota_av = url_nota_av.str.replace(r'\.com\.ar', '.com.co', regex=True)
+    df['Link Nota'] = np.where(is_av, link_nota_av, np.where(is_grafica, url_streaming, ''))
     df['Link Nota'] = df['Link Nota'].replace('', np.nan)
 
     df['Link (Streaming - Imagen)'] = df.get('URL Nota', pd.Series([''] * len(df))).fillna('').astype(str).replace('', np.nan)
