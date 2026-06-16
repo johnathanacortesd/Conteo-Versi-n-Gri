@@ -15,7 +15,15 @@ st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
 # FUNCIONES AUXILIARES
 # ==============================================================================
 
-CONFIG_PATH = Path(__file__).parent / "Configuracion.xlsx"
+# Buscar el archivo de configuración con cualquier variante de nombre/mayúsculas
+def find_config_path():
+    base = Path(__file__).parent
+    for f in base.iterdir():
+        if f.suffix.lower() == '.xlsx' and 'config' in f.stem.lower():
+            return f
+    return None
+
+CONFIG_PATH = find_config_path()
 
 def extract_link_from_cell(cell):
     if cell.hyperlink and cell.hyperlink.target:
@@ -260,9 +268,9 @@ st.markdown("Transforma archivos de entrada al formato estándar de salida con t
 config_source = None
 config_label = ""
 
-if CONFIG_PATH.exists():
+if CONFIG_PATH is not None:
     config_source = CONFIG_PATH
-    config_label = f"✅ Configuración cargada desde el repo: `Configuracion.xlsx`"
+    config_label = f"✅ Configuración cargada desde el repo: `{CONFIG_PATH.name}`"
     st.success(config_label)
 else:
     st.warning("⚠️ No se encontró `Configuracion.xlsx` en el repositorio. Súbelo manualmente:")
@@ -317,33 +325,27 @@ if uploaded_dossiers:
 # --- Resultados previos persistentes ---
 if st.session_state.get('resultados'):
     st.markdown("---")
-    st.subheader("📊 Conteos por archivo")
+    col_title, col_clear = st.columns([6, 1])
+    col_title.subheader("📊 Conteos por archivo")
+    if col_clear.button("🗑️ Borrar consultas", type="secondary"):
+        st.session_state['resultados'] = []
+        st.rerun()
 
-    resultados = st.session_state['resultados']
-    nombres = [r['nombre'] for r in resultados]
-
-    seleccionados = st.multiselect(
-        "Selecciona los archivos que quieres descargar:",
-        options=nombres,
-        default=nombres
-    )
-
-    for r in resultados:
-        with st.container():
-            st.markdown(f"**{r['nombre']}**")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("🗞️ Gráficas", r['graficas'])
-            col2.metric("🎬 AV", r['av'])
-            col3.metric("Total filas", r['total'])
-            if r['nombre'] in seleccionados:
-                st.download_button(
-                    label=f"📥 Descargar {r['nombre']}",
-                    data=r['excel'],
-                    file_name=r['filename'],
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"dl_{r['nombre']}"
-                )
-        st.markdown("---")
+    for r in st.session_state['resultados']:
+        col_nombre, col_graf, col_av, col_total, col_check, col_dl = st.columns([3, 1, 1, 1, 1, 1])
+        col_nombre.markdown(f"**{r['nombre']}**")
+        col_graf.metric("🗞️ Gráficas", r['graficas'])
+        col_av.metric("🎬 AV", r['av'])
+        col_total.metric("Total", r['total'])
+        descargar = col_check.checkbox("Descargar", value=False, key=f"chk_{r['nombre']}")
+        if descargar:
+            col_dl.download_button(
+                label="📥",
+                data=r['excel'],
+                file_name=r['filename'],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_{r['nombre']}"
+            )
 
 # --- Botón principal ---
 can_run = bool(uploaded_dossiers and config_source)
