@@ -260,6 +260,9 @@ def process_dossier(dossier_file, region_map, internet_map):
 # INTERFAZ
 # ==============================================================================
 
+if 'uploader_key' not in st.session_state:
+    st.session_state['uploader_key'] = 0
+
 st.title("🚀 Procesador SOV v2.0")
 st.markdown("Transforma archivos de entrada al formato estándar de salida con todos los mapeos aplicados.")
 
@@ -315,7 +318,7 @@ uploaded_dossiers = st.file_uploader(
     "Sube uno o varios archivos Dossier (.xlsx)",
     type=["xlsx"],
     accept_multiple_files=True,
-    key="dossiers"
+    key=f"dossiers_{st.session_state['uploader_key']}"
 )
 
 if uploaded_dossiers:
@@ -329,6 +332,7 @@ if st.session_state.get('resultados'):
     col_title.subheader("📊 Conteos por archivo")
     if col_clear.button("🗑️ Borrar consultas", type="secondary"):
         st.session_state['resultados'] = []
+        st.session_state['uploader_key'] += 1
         st.rerun()
 
     for r in st.session_state['resultados']:
