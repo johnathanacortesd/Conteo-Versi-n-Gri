@@ -121,54 +121,58 @@ def clean_cuerpo(text):
     return text.strip()
 
 def get_client_category(filename):
-    """Determina a qué categoría pertenece el archivo según su nombre, ignorando fechas iniciales."""
-    # Extraer el nombre sin extensión y pasarlo a minúsculas
+    """Determina a qué categoría pertenece el archivo según su nombre y estilo de codificación."""
+    # 1. Obtener nombre sin extensión en minúsculas
     fn = Path(filename).stem.lower()
     
-    # Limpiar posibles números o fechas al inicio del nombre del archivo (ej. "19 ", "20 ", "01 ")
-    fn_clean = re.sub(r'^\d+\s+', '', fn).strip()
+    # 2. Limpiar números iniciales, espacios, guiones y guiones bajos (ej: "18_chery_m" -> "chery_m")
+    fn_clean = re.sub(r'^[\d\s\-_]+', '', fn).strip()
     
-    # Evaluar si contiene indicadores de competencia como palabra aislada o terminaciones específicas
-    is_competencia = False
-    if re.search(r'\b(c|com|comp|competencia|competencias|changan)\b', fn_clean) or fn_clean.endswith('_c') or fn_clean.endswith('-c') or fn_clean.endswith(' c'):
-        is_competencia = True
-        
-    # 1. Detección de Chery (Marca vs Competencia)
-    if "chery" in fn_clean or "anchery" in fn_clean:
+    # 3. Tokenizar el nombre utilizando cualquier caracter no alfanumérico como separador
+    tokens = re.split(r'[^a-z0-9]', fn_clean)
+    tokens = [t.strip() for t in tokens if t.strip()]
+    
+    # 4. Determinar si es un archivo de competencia evaluando palabras completas
+    comp_keywords = {"c", "com", "comp", "competencia", "competencias", "changan"}
+    is_competencia = any(t in comp_keywords for t in tokens)
+    
+    # 5. Mapeo de clientes por coincidencia de tokens
+    # Chery / ANCHERY
+    if any(t in ["chery", "anchery"] for t in tokens):
         if is_competencia:
             return "Chery - Changan, Competencias"
         else:
             return "Chery 01-18 | |19-31"
             
-    # 2. Detección de Nissan (Marca vs Competencia)
-    elif "niss" in fn_clean or "nissan" in fn_clean or "annissan" in fn_clean:
+    # Nissan / ANNISSAN
+    elif any(t in ["niss", "nissan", "annissan"] for t in tokens):
         if is_competencia:
             return "Nissan, Competencia"
         else:
             return "Nissan"
             
-    # 3. Detección de Comfenalco Valle
-    elif "comfe" in fn_clean or "comfenalco" in fn_clean or "acomfevalle" in fn_clean:
+    # Comfenalco Valle
+    elif any(t in ["comfe", "comfenalco", "acomfevalle"] for t in tokens):
         return "Comfenalco Valle"
         
-    # 4. Detección de Federación Nacional de Avicultores de Colombia
-    elif any(x in fn_clean for x in ["fenavi", "avicultores", "avicola", "anfenavi"]):
+    # Federación Nacional de Avicultores de Colombia
+    elif any(t in ["fenavi", "avicultores", "avicola", "anfenavi"] for t in tokens):
         return "Federación Nacional de Avicultores de Colombia"
         
-    # 5. Detección de Fundación Santa Fe de Bogotá
-    elif any(x in fn_clean for x in ["fsant", "santa", "santafe", "fsantafe_an"]):
+    # Fundación Santa Fe de Bogotá
+    elif any(t in ["fsant", "santa", "santafe", "fsantafe_an"] for t in tokens):
         return "Fundación Santa Fe de Bogotá"
         
-    # 6. Detección de Tigo
-    elif "tigo" in fn_clean or "tigoan" in fn_clean:
+    # Tigo
+    elif any(t in ["tigo", "tigoan"] for t in tokens):
         return "Tigo"
         
-    # 7. Detección de Universidad Simón Bolívar
-    elif any(x in fn_clean for x in ["simon", "usimon", "usim", "usimonan"]):
+    # Universidad Simón Bolívar
+    elif any(t in ["simon", "usimon", "usim", "usimonan"] for t in tokens):
         return "Universidad Simón Bolívar"
         
-    # 8. Detección de Universidad Tecnológica de Bolívar
-    elif any(x in fn_clean for x in ["utb", "tecnologica", "utb_an"]):
+    # Universidad Tecnológica de Bolívar
+    elif any(t in ["utb", "tecnologica", "utb_an"] for t in tokens):
         return "Universidad Tecnológica de Bolívar"
         
     return None
@@ -572,14 +576,14 @@ if st.session_state.get('resultados'):
                     )
                 
                 if r.get('matched_client'):
-                    st.caption(f"🎯 Cliente detectado: **{r['matched_client']}**")
+                    st.success(f"🎯 Archivo `{r['nombre']}` detectado como: **{r['matched_client']}**")
                 else:
-                    st.caption("⚠️ No se pudo auto-detectar el cliente en este archivo.")
+                    st.warning(f"⚠️ El archivo `{r['nombre']}` no pudo ser auto-detectado.")
                 st.markdown("---")
                 
     with tab_consolidado:
         st.subheader("📊 Conteo Total de Registros")
-        st.markdown("Este conteo acumula los registros de todos los archivos procesados en el orden estándar:")
+        st.markdown("Este conteo acumula los registros de todos los archivos procesados en el orden estándar de salida:")
         
         # Reunimos los datos acumulados de cada archivo procesado
         listado_archivos = []
