@@ -9,7 +9,7 @@ import html
 import numpy as np
 from pathlib import Path
 
-st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
+st.set_page_config(page_title="Conteo v2.0", layout="wide")
 
 # ==============================================================================
 # FUNCIONES AUXILIARES
@@ -76,7 +76,34 @@ def clean_cuerpo(text):
     text = re.sub(r'<[^>]+>', '', text)
     return text.strip()
 
-def to_excel_from_df(df, final_order):
+def get_client_category(filename):
+    """Determina a qué categoría/cliente pertenece el archivo según su nombre."""
+    fn = filename.lower()
+    if "chery" in fn:
+        if any(x in fn for x in ["com", "compet"]):
+            return "Chery - Changan, Competencias"
+        else:
+            return "Chery 01-18 | |19-31"
+    elif "niss" in fn or "nissan" in fn:
+        if any(x in fn for x in ["com", "compet"]):
+            return "Nissan, Competencia"
+        else:
+            return "Nissan"
+    elif "comfenalco" in fn:
+        return "Comfenalco Valle"
+    elif any(x in fn for x in ["fenavi", "avicultores", "avicola"]):
+        return "Federación Nacional de Avicultores de Colombia"
+    elif any(x in fn for x in ["santa", "santafe", "bogota"]):
+        return "Fundación Santa Fe de Bogotá"
+    elif "tigo" in fn:
+        return "Tigo"
+    elif any(x in fn for x in ["simon", "usimon"]):
+        return "Universidad Simón Bolívar"
+    elif any(x in fn for x in ["utb", "tecnologica"]):
+        return "Universidad Tecnológica de Bolívar"
+    return None
+
+def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
     output = io.BytesIO()
     cols = [c for c in final_order if c in df.columns]
     df_out = df[cols].copy()
@@ -121,6 +148,81 @@ def to_excel_from_df(df, final_order):
             ws.column_dimensions[letter].width = 15
         else:
             ws.column_dimensions[letter].width = 20
+
+    # --- PESTAÑA ADICIONAL: Conteo ---
+    ws2 = wb.create_sheet(title='Conteo')
+    
+    # Encabezados de la tabla de conteo
+    headers_conteo = ["Cliente / Categoría", "Tipo de Conteo", "Código", "Cantidad"]
+    for col_idx, h in enumerate(headers_conteo, start=1):
+        cell = ws2.cell(row=1, column=col_idx, value=h)
+        cell.font = Font(bold=True)
+
+    matched_client = get_client_category(filename)
+
+    conteo_template = [
+        ("Chery 01-18 | |19-31", "Codificación Audiovisuales", "ANCHERY"),
+        ("Chery 01-18 | |19-31", "Codificación Impresos", "ANCHERY"),
+        ("Chery 01-18 | |19-31", "Notas Audiovisuales", "ANCHERY"),
+        ("Chery 01-18 | |19-31", "Notas Impresos", "ANCHERY"),
+        ("Chery - Changan, Competencias", "Codificación Audiovisuales", "ANCHERY"),
+        ("Chery - Changan, Competencias", "Codificación Impresos", "ANCHERY"),
+        ("Chery - Changan, Competencias", "Notas Audiovisuales", "ANCHERY"),
+        ("Chery - Changan, Competencias", "Notas Impresos", "ANCHERY"),
+        ("Comfenalco Valle", "Codificación Audiovisuales", "ACOMFEVALLE"),
+        ("Comfenalco Valle", "Codificación Impresos", "ACOMFEVALLE"),
+        ("Comfenalco Valle", "Notas Audiovisuales", "ACOMFEVALLE"),
+        ("Comfenalco Valle", "Notas Impresos", "ACOMFEVALLE"),
+        ("Federación Nacional de Avicultores de Colombia", "Codificación Audiovisuales", "ANFENAVI"),
+        ("Federación Nacional de Avicultores de Colombia", "Codificación Impresos", "ANFENAVI"),
+        ("Federación Nacional de Avicultores de Colombia", "Notas Audiovisuales", "ANFENAVI"),
+        ("Federación Nacional de Avicultores de Colombia", "Notas Impresos", "ANFENAVI"),
+        ("Fundación Santa Fe de Bogotá", "Codificación Audiovisuales", "FSANTAFE_AN"),
+        ("Fundación Santa Fe de Bogotá", "Codificación Impresos", "FSANTAFE_AN"),
+        ("Fundación Santa Fe de Bogotá", "Notas Audiovisuales", "FSANTAFE_AN"),
+        ("Fundación Santa Fe de Bogotá", "Notas Impresos", "FSANTAFE_AN"),
+        ("Nissan", "Codificación Audiovisuales", "ANNISSAN"),
+        ("Nissan", "Codificación Impresos", "ANNISSAN"),
+        ("Nissan", "Notas Audiovisuales", "ANNISSAN"),
+        ("Nissan", "Notas Impresos", "ANNISSAN"),
+        ("Nissan, Competencia", "Codificación Audiovisuales", "ANNISSAN"),
+        ("Nissan, Competencia", "Codificación Impresos", "ANNISSAN"),
+        ("Nissan, Competencia", "Notas Audiovisuales", "ANNISSAN"),
+        ("Nissan, Competencia", "Notas Impresos", "ANNISSAN"),
+        ("Tigo", "Codificación Audiovisuales", "TIGOAN"),
+        ("Tigo", "Codificación Impresos", "TIGOAN"),
+        ("Tigo", "Notas Audiovisuales", "TIGOAN"),
+        ("Tigo", "Notas Impresos", "TIGOAN"),
+        ("Universidad Simón Bolívar", "Codificación Audiovisuales", "USIMONAN"),
+        ("Universidad Simón Bolívar", "Codificación Impresos", "USIMONAN"),
+        ("Universidad Simón Bolívar", "Notas Audiovisuales", "USIMONAN"),
+        ("Universidad Simón Bolívar", "Notas Impresos", "USIMONAN"),
+        ("Universidad Tecnológica de Bolívar", "Codificación Audiovisuales", "UTB_AN"),
+        ("Universidad Tecnológica de Bolívar", "Codificación Impresos", "UTB_AN"),
+        ("Universidad Tecnológica de Bolívar", "Notas Audiovisuales", "UTB_AN"),
+        ("Universidad Tecnológica de Bolívar", "Notas Impresos", "UTB_AN")
+    ]
+
+    for idx, (client, tipo, codigo) in enumerate(conteo_template, start=2):
+        ws2.cell(row=idx, column=1, value=client)
+        ws2.cell(row=idx, column=2, value=tipo)
+        ws2.cell(row=idx, column=3, value=codigo)
+        
+        # Calcular cantidad
+        val = 0
+        if client == matched_client:
+            if tipo == "Notas Audiovisuales":
+                val = av_count
+            elif tipo == "Notas Impresos":
+                val = grafica_count
+        
+        ws2.cell(row=idx, column=4, value=val)
+
+    # Autoajuste de columnas
+    for col in ws2.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = col[0].column_letter
+        ws2.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
     wb.save(output)
     output.seek(0)
@@ -377,7 +479,7 @@ if st.button("▶️ Iniciar Proceso", disabled=not can_run, type="primary"):
         with st.spinner(f"Procesando {dossier_file.name}..."):
             try:
                 df, av_count, grafica_count = process_dossier(dossier_file, region_map, internet_map)
-                excel_data = to_excel_from_df(df, final_order)
+                excel_data = to_excel_from_df(df, final_order, dossier_file.name, av_count, grafica_count)
                 resultados.append({
                     'nombre': dossier_file.name,
                     'graficas': grafica_count,
