@@ -488,8 +488,10 @@ if st.session_state.get('resultados'):
             else:
                 st.warning("⚠️ No se pudo auto-detectar el cliente en este archivo. Todos los conteos en la pestaña 'Conteo' serán 0.")
             
-            with st.expander(f"👁️ Vista previa de la pestaña Conteo para {r['nombre']}"):
-                st.dataframe(r['conteo_df'], use_container_width=True, hide_index=True)
+            # Comprobación de seguridad para evitar KeyError con sesiones previas
+            if 'conteo_df' in r:
+                with st.expander(f"👁️ Vista previa de la pestaña Conteo para {r['nombre']}"):
+                    st.dataframe(r['conteo_df'], use_container_width=True, hide_index=True)
                 
             st.markdown("---")
 
