@@ -121,49 +121,54 @@ def clean_cuerpo(text):
     return text.strip()
 
 def get_client_category(filename):
-    """Determina a qué categoría pertenece el archivo según su nombre y estilo de codificación."""
-    fn = filename.lower()
+    """Determina a qué categoría pertenece el archivo según su nombre, ignorando fechas iniciales."""
+    # Extraer el nombre sin extensión y pasarlo a minúsculas
+    fn = Path(filename).stem.lower()
     
+    # Limpiar posibles números o fechas al inicio del nombre del archivo (ej. "19 ", "20 ", "01 ")
+    fn_clean = re.sub(r'^\d+\s+', '', fn).strip()
+    
+    # Evaluar si contiene indicadores de competencia como palabra aislada o terminaciones específicas
     is_competencia = False
-    if re.search(r'\b(c|com|comp|competencia|competencias|changan)\b', fn) or "_c" in fn or "-c" in fn:
+    if re.search(r'\b(c|com|comp|competencia|competencias|changan)\b', fn_clean) or fn_clean.endswith('_c') or fn_clean.endswith('-c') or fn_clean.endswith(' c'):
         is_competencia = True
         
     # 1. Detección de Chery (Marca vs Competencia)
-    if "chery" in fn or "anchery" in fn:
+    if "chery" in fn_clean or "anchery" in fn_clean:
         if is_competencia:
             return "Chery - Changan, Competencias"
         else:
             return "Chery 01-18 | |19-31"
             
     # 2. Detección de Nissan (Marca vs Competencia)
-    elif "niss" in fn or "nissan" in fn or "annissan" in fn:
+    elif "niss" in fn_clean or "nissan" in fn_clean or "annissan" in fn_clean:
         if is_competencia:
             return "Nissan, Competencia"
         else:
             return "Nissan"
             
     # 3. Detección de Comfenalco Valle
-    elif "comfe" in fn or "comfenalco" in fn or "acomfevalle" in fn:
+    elif "comfe" in fn_clean or "comfenalco" in fn_clean or "acomfevalle" in fn_clean:
         return "Comfenalco Valle"
         
     # 4. Detección de Federación Nacional de Avicultores de Colombia
-    elif any(x in fn for x in ["fenavi", "avicultores", "avicola", "anfenavi"]):
+    elif any(x in fn_clean for x in ["fenavi", "avicultores", "avicola", "anfenavi"]):
         return "Federación Nacional de Avicultores de Colombia"
         
     # 5. Detección de Fundación Santa Fe de Bogotá
-    elif any(x in fn for x in ["fsant", "santa", "santafe", "fsantafe_an"]):
+    elif any(x in fn_clean for x in ["fsant", "santa", "santafe", "fsantafe_an"]):
         return "Fundación Santa Fe de Bogotá"
         
     # 6. Detección de Tigo
-    elif "tigo" in fn or "tigoan" in fn:
+    elif "tigo" in fn_clean or "tigoan" in fn_clean:
         return "Tigo"
         
     # 7. Detección de Universidad Simón Bolívar
-    elif any(x in fn for x in ["simon", "usimon", "usim", "usimonan"]):
+    elif any(x in fn_clean for x in ["simon", "usimon", "usim", "usimonan"]):
         return "Universidad Simón Bolívar"
         
     # 8. Detección de Universidad Tecnológica de Bolívar
-    elif any(x in fn for x in ["utb", "tecnologica", "utb_an"]):
+    elif any(x in fn_clean for x in ["utb", "tecnologica", "utb_an"]):
         return "Universidad Tecnológica de Bolívar"
         
     return None
@@ -538,7 +543,6 @@ if uploaded_dossiers:
 if st.session_state.get('resultados'):
     st.markdown("---")
     
-    # Creamos las dos pestañas solicitadas en la interfaz de usuario
     tab_archivos, tab_consolidado = st.tabs(["📋 Detalle por Archivo", "📊 Conteo Total Consolidado"])
     
     with tab_archivos:
@@ -575,7 +579,7 @@ if st.session_state.get('resultados'):
                 
     with tab_consolidado:
         st.subheader("📊 Conteo Total de Registros")
-        st.markdown("Tabla combinada y consolidada de los archivos procesados en el orden estándar de salida:")
+        st.markdown("Este conteo acumula los registros de todos los archivos procesados en el orden estándar:")
         
         # Reunimos los datos acumulados de cada archivo procesado
         listado_archivos = []
@@ -588,18 +592,31 @@ if st.session_state.get('resultados'):
             
         df_consolidado = build_consolidated_conteo(listado_archivos)
         
-        # Mostramos la tabla consolidada directamente
-        st.dataframe(df_consolidado, use_container_width=True, hide_index=True)
+        # Dividimos en columnas: la tabla visual a la izquierda y el área de copiado rápido numérico a la derecha
+        col_table, col_numeric = st.columns([2, 1])
         
-        # Generar botón para descargar el Excel únicamente de la tabla consolidada de conteos
-        excel_cons = to_excel_consolidated(df_consolidado)
-        st.download_button(
-            label="📥 Descargar Tabla Conteo Consolidada (Excel)",
-            data=excel_cons,
-            file_name=f"Conteo_Consolidado_SOV_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_total_consolidado"
-        )
+        with col_table:
+            st.dataframe(df_consolidado, use_container_width=True, hide_index=True)
+            
+            # Generar botón para descargar el Excel únicamente de la tabla consolidada de conteos
+            excel_cons = to_excel_consolidated(df_consolidado)
+            st.download_button(
+                label="📥 Descargar Tabla Conteo Consolidada (Excel)",
+                data=excel_cons,
+                file_name=f"Conteo_Consolidado_SOV_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_total_consolidado"
+            )
+            
+        with col_numeric:
+            st.markdown("### 📋 Copiar Datos Numéricos")
+            st.markdown("Selecciona y copia directamente esta columna de valores para pegarla rápidamente en tu plantilla externa de Excel:")
+            
+            # Extraer solo las cantidades como texto separado por saltos de línea
+            raw_numbers_str = "\n".join(df_consolidado["Cantidad"].astype(str).tolist())
+            
+            # Text area interactivo de fácil copiado
+            st.text_area("Cantidades en orden (40 valores):", value=raw_numbers_str, height=350, key="raw_numeric_area")
 
 # --- Botón principal ---
 can_run = bool(uploaded_dossiers and config_source)
