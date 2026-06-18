@@ -9,7 +9,7 @@ import html
 import numpy as np
 from pathlib import Path
 
-st.set_page_config(page_title="Conteo v2.0", layout="wide")
+st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
 
 # ==============================================================================
 # FUNCIONES AUXILIARES
@@ -77,18 +77,38 @@ def clean_cuerpo(text):
     return text.strip()
 
 def get_client_category(filename):
-    """Determina a qué categoría/cliente pertenece el archivo según su nombre."""
+    """Determina a qué categoría pertenece el archivo según su nombre."""
     fn = filename.lower()
+    
+    # Detección de Chery (Marca vs Competencia)
     if "chery" in fn:
-        if any(x in fn for x in ["com", "compet"]):
+        is_competencia = False
+        for word in ["com", "comp", "compet", "changan"]:
+            if word in fn:
+                is_competencia = True
+        if re.search(r'\b(c|com|comp)\b', fn) or "chery_c" in fn or "chery-c" in fn or "cheryc" in fn:
+            is_competencia = True
+            
+        if is_competencia:
             return "Chery - Changan, Competencias"
         else:
             return "Chery 01-18 | |19-31"
+            
+    # Detección de Nissan (Marca vs Competencia)
     elif "niss" in fn or "nissan" in fn:
-        if any(x in fn for x in ["com", "compet"]):
+        is_competencia = False
+        for word in ["com", "comp", "compet"]:
+            if word in fn:
+                is_competencia = True
+        if re.search(r'\b(c|com|comp)\b', fn) or "niss_c" in fn or "nissan_c" in fn or "niss-c" in fn or "nissc" in fn:
+            is_competencia = True
+            
+        if is_competencia:
             return "Nissan, Competencia"
         else:
             return "Nissan"
+            
+    # Otros clientes
     elif "comfenalco" in fn:
         return "Comfenalco Valle"
     elif any(x in fn for x in ["fenavi", "avicultores", "avicola"]):
@@ -103,63 +123,10 @@ def get_client_category(filename):
         return "Universidad Tecnológica de Bolívar"
     return None
 
-def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
-    output = io.BytesIO()
-    cols = [c for c in final_order if c in df.columns]
-    df_out = df[cols].copy()
-
-    for col in df_out.columns:
-        if hasattr(df_out[col].dtype, 'pyarrow_dtype'):
-            df_out[col] = df_out[col].astype(object)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Resultado'
-
-    for i, col_name in enumerate(df_out.columns, start=1):
-        cell = ws.cell(row=1, column=i, value=col_name)
-        cell.font = Font(bold=True)
-
-    link_cols = {'Link Nota', 'Link (Streaming - Imagen)'}
-
-    for row_idx, row_data in enumerate(df_out.itertuples(index=False), start=2):
-        for col_idx, value in enumerate(row_data, start=1):
-            col_name = df_out.columns[col_idx - 1]
-            cell = ws.cell(row=row_idx, column=col_idx)
-            if col_name == 'Fecha' and pd.notna(value):
-                if isinstance(value, pd.Timestamp):
-                    cell.value = value.to_pydatetime()
-                    cell.number_format = 'DD/MM/YYYY'
-                else:
-                    cell.value = value
-            elif col_name in link_cols and pd.notna(value) and isinstance(value, str) and value.startswith('http'):
-                cell.value = 'Link'
-                cell.hyperlink = value
-                cell.font = Font(color="0563C1", underline="single")
-                cell.alignment = Alignment(horizontal='left')
-            else:
-                cell.value = value if pd.notna(value) else None
-
-    for i, col_name in enumerate(df_out.columns, start=1):
-        letter = ws.cell(row=1, column=i).column_letter
-        if col_name in ['Título', 'Resumen - Aclaracion']:
-            ws.column_dimensions[letter].width = 50
-        elif col_name in ['Link Nota', 'Link (Streaming - Imagen)']:
-            ws.column_dimensions[letter].width = 15
-        else:
-            ws.column_dimensions[letter].width = 20
-
-    # --- PESTAÑA ADICIONAL: Conteo ---
-    ws2 = wb.create_sheet(title='Conteo')
-    
-    # Encabezados de la tabla de conteo
-    headers_conteo = ["Cliente / Categoría", "Tipo de Conteo", "Código", "Cantidad"]
-    for col_idx, h in enumerate(headers_conteo, start=1):
-        cell = ws2.cell(row=1, column=col_idx, value=h)
-        cell.font = Font(bold=True)
-
+def build_conteo_df(filename, av_count, grafica_count):
+    """Construye un DataFrame con el formato y orden exacto para la hoja de conteos."""
     matched_client = get_client_category(filename)
-
+    
     conteo_template = [
         ("Chery 01-18 | |19-31", "Codificación Audiovisuales", "ANCHERY"),
         ("Chery 01-18 | |19-31", "Codificación Impresos", "ANCHERY"),
@@ -202,23 +169,84 @@ def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
         ("Universidad Tecnológica de Bolívar", "Notas Audiovisuales", "UTB_AN"),
         ("Universidad Tecnológica de Bolívar", "Notas Impresos", "UTB_AN")
     ]
-
-    for idx, (client, tipo, codigo) in enumerate(conteo_template, start=2):
-        ws2.cell(row=idx, column=1, value=client)
-        ws2.cell(row=idx, column=2, value=tipo)
-        ws2.cell(row=idx, column=3, value=codigo)
-        
-        # Calcular cantidad
+    
+    rows = []
+    for client, tipo, codigo in conteo_template:
         val = 0
         if client == matched_client:
             if tipo == "Notas Audiovisuales":
                 val = av_count
             elif tipo == "Notas Impresos":
                 val = grafica_count
+        rows.append({
+            "Cliente / Categoría": client,
+            "Tipo de Conteo": tipo,
+            "Código": codigo,
+            "Cantidad": val
+        })
         
-        ws2.cell(row=idx, column=4, value=val)
+    return pd.DataFrame(rows), matched_client
 
-    # Autoajuste de columnas
+def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
+    output = io.BytesIO()
+    cols = [c for c in final_order if c in df.columns]
+    df_out = df[cols].copy()
+
+    for col in df_out.columns:
+        if hasattr(df_out[col].dtype, 'pyarrow_dtype'):
+            df_out[col] = df_out[col].astype(object)
+
+    wb = Workbook()
+    
+    # 1. Hoja "Resultado"
+    ws = wb.active
+    ws.title = 'Resultado'
+
+    for i, col_name in enumerate(df_out.columns, start=1):
+        cell = ws.cell(row=1, column=i, value=col_name)
+        cell.font = Font(bold=True)
+
+    link_cols = {'Link Nota', 'Link (Streaming - Imagen)'}
+
+    for row_idx, row_data in enumerate(df_out.itertuples(index=False), start=2):
+        for col_idx, value in enumerate(row_data, start=1):
+            col_name = df_out.columns[col_idx - 1]
+            cell = ws.cell(row=row_idx, column=col_idx)
+            if col_name == 'Fecha' and pd.notna(value):
+                if isinstance(value, pd.Timestamp):
+                    cell.value = value.to_pydatetime()
+                    cell.number_format = 'DD/MM/YYYY'
+                else:
+                    cell.value = value
+            elif col_name in link_cols and pd.notna(value) and isinstance(value, str) and value.startswith('http'):
+                cell.value = 'Link'
+                cell.hyperlink = value
+                cell.font = Font(color="0563C1", underline="single")
+                cell.alignment = Alignment(horizontal='left')
+            else:
+                cell.value = value if pd.notna(value) else None
+
+    for i, col_name in enumerate(df_out.columns, start=1):
+        letter = ws.cell(row=1, column=i).column_letter
+        if col_name in ['Título', 'Resumen - Aclaracion']:
+            ws.column_dimensions[letter].width = 50
+        elif col_name in ['Link Nota', 'Link (Streaming - Imagen)']:
+            ws.column_dimensions[letter].width = 15
+        else:
+            ws.column_dimensions[letter].width = 20
+
+    # 2. Hoja "Conteo" (pestaña adicional)
+    ws2 = wb.create_sheet(title='Conteo')
+    df_conteo, _ = build_conteo_df(filename, av_count, grafica_count)
+    
+    for col_idx, col_name in enumerate(df_conteo.columns, start=1):
+        cell = ws2.cell(row=1, column=col_idx, value=col_name)
+        cell.font = Font(bold=True)
+        
+    for row_idx, row_data in enumerate(df_conteo.itertuples(index=False), start=2):
+        for col_idx, val in enumerate(row_data, start=1):
+            ws2.cell(row=row_idx, column=col_idx, value=val)
+            
     for col in ws2.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = col[0].column_letter
@@ -365,11 +393,10 @@ def process_dossier(dossier_file, region_map, internet_map):
 if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0
 
-st.title("🚀 Conteo v2.0")
+st.title("🚀 Procesador SOV v2.0")
 st.markdown("Transforma archivos de entrada al formato estándar de salida con todos los mapeos aplicados.")
 
 # --- Configuración ---
-# Intentar cargar desde el repo; si no existe, pedir que se suba
 config_source = None
 config_label = ""
 
@@ -438,20 +465,33 @@ if st.session_state.get('resultados'):
         st.rerun()
 
     for r in st.session_state['resultados']:
-        col_nombre, col_graf, col_av, col_total, col_check, col_dl = st.columns([3, 1, 1, 1, 1, 1])
-        col_nombre.markdown(f"**{r['nombre']}**")
-        col_graf.metric("🗞️ Gráficas", r['graficas'])
-        col_av.metric("🎬 AV", r['av'])
-        col_total.metric("Total", r['total'])
-        descargar = col_check.checkbox("Descargar", value=False, key=f"chk_{r['nombre']}")
-        if descargar:
-            col_dl.download_button(
-                label="📥",
-                data=r['excel'],
-                file_name=r['filename'],
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_{r['nombre']}"
-            )
+        with st.container():
+            col_nombre, col_graf, col_av, col_total, col_check, col_dl = st.columns([3, 1, 1, 1, 1, 1])
+            col_nombre.markdown(f"**{r['nombre']}**")
+            col_graf.metric("🗞️ Gráficas", r['graficas'])
+            col_av.metric("🎬 AV", r['av'])
+            col_total.metric("Total", r['total'])
+            
+            descargar = col_check.checkbox("Descargar", value=False, key=f"chk_{r['nombre']}")
+            if descargar:
+                col_dl.download_button(
+                    label="📥 Descargar Excel",
+                    data=r['excel'],
+                    file_name=r['filename'],
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_{r['nombre']}"
+                )
+            
+            # Notificación visual del cliente detectado para confirmación
+            if r.get('matched_client'):
+                st.success(f"🎯 Cliente detectado: **{r['matched_client']}**")
+            else:
+                st.warning("⚠️ No se pudo auto-detectar el cliente en este archivo. Todos los conteos en la pestaña 'Conteo' serán 0.")
+            
+            with st.expander(f"👁️ Vista previa de la pestaña Conteo para {r['nombre']}"):
+                st.dataframe(r['conteo_df'], use_container_width=True, hide_index=True)
+                
+            st.markdown("---")
 
 # --- Botón principal ---
 can_run = bool(uploaded_dossiers and config_source)
@@ -480,12 +520,16 @@ if st.button("▶️ Iniciar Proceso", disabled=not can_run, type="primary"):
             try:
                 df, av_count, grafica_count = process_dossier(dossier_file, region_map, internet_map)
                 excel_data = to_excel_from_df(df, final_order, dossier_file.name, av_count, grafica_count)
+                df_conteo, matched = build_conteo_df(dossier_file.name, av_count, grafica_count)
+                
                 resultados.append({
                     'nombre': dossier_file.name,
                     'graficas': grafica_count,
                     'av': av_count,
                     'total': len(df),
                     'excel': excel_data,
+                    'conteo_df': df_conteo,
+                    'matched_client': matched,
                     'filename': f"SOV_{dossier_file.name.replace('.xlsx','')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
                 })
             except Exception as e:
