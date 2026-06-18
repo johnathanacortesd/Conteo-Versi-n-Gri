@@ -9,7 +9,7 @@ import html
 import numpy as np
 from pathlib import Path
 
-st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
+st.set_page_config(page_title="Conteo v2.0", layout="wide")
 
 # ==============================================================================
 # FUNCIONES AUXILIARES
@@ -482,7 +482,7 @@ def process_dossier(dossier_file, region_map, internet_map):
 if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0
 
-st.title("🚀 Procesador SOV v2.0")
+st.title("🚀 Conteo v2.0")
 st.markdown("Transforma archivos de entrada al formato estándar de salida con todos los mapeos aplicados.")
 
 # --- Configuración ---
