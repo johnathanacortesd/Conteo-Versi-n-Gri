@@ -77,50 +77,52 @@ def clean_cuerpo(text):
     return text.strip()
 
 def get_client_category(filename):
-    """Determina a qué categoría pertenece el archivo según su nombre."""
+    """Determina a qué categoría pertenece el archivo según su nombre y estilo de codificación."""
     fn = filename.lower()
     
-    # Detección de Chery (Marca vs Competencia)
-    if "chery" in fn:
-        is_competencia = False
-        for word in ["com", "comp", "compet", "changan"]:
-            if word in fn:
-                is_competencia = True
-        if re.search(r'\b(c|com|comp)\b', fn) or "chery_c" in fn or "chery-c" in fn or "cheryc" in fn:
-            is_competencia = True
-            
+    # Evalúa si contiene indicadores de competencia como una palabra aislada o guiones: "c", "com", "comp", etc.
+    is_competencia = False
+    if re.search(r'\b(c|com|comp|competencia|competencias|changan)\b', fn) or "_c" in fn or "-c" in fn:
+        is_competencia = True
+        
+    # 1. Detección de Chery (Marca vs Competencia)
+    if "chery" in fn or "anchery" in fn:
         if is_competencia:
             return "Chery - Changan, Competencias"
         else:
             return "Chery 01-18 | |19-31"
             
-    # Detección de Nissan (Marca vs Competencia)
-    elif "niss" in fn or "nissan" in fn:
-        is_competencia = False
-        for word in ["com", "comp", "compet"]:
-            if word in fn:
-                is_competencia = True
-        if re.search(r'\b(c|com|comp)\b', fn) or "niss_c" in fn or "nissan_c" in fn or "niss-c" in fn or "nissc" in fn:
-            is_competencia = True
-            
+    # 2. Detección de Nissan (Marca vs Competencia)
+    elif "niss" in fn or "nissan" in fn or "annissan" in fn:
         if is_competencia:
             return "Nissan, Competencia"
         else:
             return "Nissan"
             
-    # Otros clientes
-    elif "comfenalco" in fn:
+    # 3. Detección de Comfenalco Valle
+    elif "comfe" in fn or "comfenalco" in fn or "acomfevalle" in fn:
         return "Comfenalco Valle"
-    elif any(x in fn for x in ["fenavi", "avicultores", "avicola"]):
+        
+    # 4. Detección de Federación Nacional de Avicultores de Colombia
+    elif any(x in fn for x in ["fenavi", "avicultores", "avicola", "anfenavi"]):
         return "Federación Nacional de Avicultores de Colombia"
-    elif any(x in fn for x in ["santa", "santafe", "bogota"]):
+        
+    # 5. Detección de Fundación Santa Fe de Bogotá
+    elif any(x in fn for x in ["fsant", "santa", "santafe", "fsantafe_an"]):
         return "Fundación Santa Fe de Bogotá"
-    elif "tigo" in fn:
+        
+    # 6. Detección de Tigo
+    elif "tigo" in fn or "tigoan" in fn:
         return "Tigo"
-    elif any(x in fn for x in ["simon", "usimon"]):
+        
+    # 7. Detección de Universidad Simón Bolívar
+    elif any(x in fn for x in ["simon", "usimon", "usim", "usimonan"]):
         return "Universidad Simón Bolívar"
-    elif any(x in fn for x in ["utb", "tecnologica"]):
+        
+    # 8. Detección de Universidad Tecnológica de Bolívar
+    elif any(x in fn for x in ["utb", "tecnologica", "utb_an"]):
         return "Universidad Tecnológica de Bolívar"
+        
     return None
 
 def build_conteo_df(filename, av_count, grafica_count):
