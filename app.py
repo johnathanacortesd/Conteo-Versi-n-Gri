@@ -15,6 +15,50 @@ st.set_page_config(page_title="Procesador SOV v2.0", layout="wide")
 # FUNCIONES AUXILIARES
 # ==============================================================================
 
+# Plantilla de orden estándar definida de manera global
+CONTEO_TEMPLATE = [
+    ("Chery 01-18 | |19-31", "Codificación Audiovisuales", "ANCHERY"),
+    ("Chery 01-18 | |19-31", "Codificación Impresos", "ANCHERY"),
+    ("Chery 01-18 | |19-31", "Notas Audiovisuales", "ANCHERY"),
+    ("Chery 01-18 | |19-31", "Notas Impresos", "ANCHERY"),
+    ("Chery - Changan, Competencias", "Codificación Audiovisuales", "ANCHERY"),
+    ("Chery - Changan, Competencias", "Codificación Impresos", "ANCHERY"),
+    ("Chery - Changan, Competencias", "Notas Audiovisuales", "ANCHERY"),
+    ("Chery - Changan, Competencias", "Notas Impresos", "ANCHERY"),
+    ("Comfenalco Valle", "Codificación Audiovisuales", "ACOMFEVALLE"),
+    ("Comfenalco Valle", "Codificación Impresos", "ACOMFEVALLE"),
+    ("Comfenalco Valle", "Notas Audiovisuales", "ACOMFEVALLE"),
+    ("Comfenalco Valle", "Notas Impresos", "ACOMFEVALLE"),
+    ("Federación Nacional de Avicultores de Colombia", "Codificación Audiovisuales", "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Codificación Impresos", "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Notas Audiovisuales", "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Notas Impresos", "ANFENAVI"),
+    ("Fundación Santa Fe de Bogotá", "Codificación Audiovisuales", "FSANTAFE_AN"),
+    ("Fundación Santa Fe de Bogotá", "Codificación Impresos", "FSANTAFE_AN"),
+    ("Fundación Santa Fe de Bogotá", "Notas Audiovisuales", "FSANTAFE_AN"),
+    ("Fundación Santa Fe de Bogotá", "Notas Impresos", "FSANTAFE_AN"),
+    ("Nissan", "Codificación Audiovisuales", "ANNISSAN"),
+    ("Nissan", "Codificación Impresos", "ANNISSAN"),
+    ("Nissan", "Notas Audiovisuales", "ANNISSAN"),
+    ("Nissan", "Notas Impresos", "ANNISSAN"),
+    ("Nissan, Competencia", "Codificación Audiovisuales", "ANNISSAN"),
+    ("Nissan, Competencia", "Codificación Impresos", "ANNISSAN"),
+    ("Nissan, Competencia", "Notas Audiovisuales", "ANNISSAN"),
+    ("Nissan, Competencia", "Notas Impresos", "ANNISSAN"),
+    ("Tigo", "Codificación Audiovisuales", "TIGOAN"),
+    ("Tigo", "Codificación Impresos", "TIGOAN"),
+    ("Tigo", "Notas Audiovisuales", "TIGOAN"),
+    ("Tigo", "Notas Impresos", "TIGOAN"),
+    ("Universidad Simón Bolívar", "Codificación Audiovisuales", "USIMONAN"),
+    ("Universidad Simón Bolívar", "Codificación Impresos", "USIMONAN"),
+    ("Universidad Simón Bolívar", "Notas Audiovisuales", "USIMONAN"),
+    ("Universidad Simón Bolívar", "Notas Impresos", "USIMONAN"),
+    ("Universidad Tecnológica de Bolívar", "Codificación Audiovisuales", "UTB_AN"),
+    ("Universidad Tecnológica de Bolívar", "Codificación Impresos", "UTB_AN"),
+    ("Universidad Tecnológica de Bolívar", "Notas Audiovisuales", "UTB_AN"),
+    ("Universidad Tecnológica de Bolívar", "Notas Impresos", "UTB_AN")
+]
+
 # Buscar el archivo de configuración con cualquier variante de nombre/mayúsculas
 def find_config_path():
     base = Path(__file__).parent
@@ -80,7 +124,6 @@ def get_client_category(filename):
     """Determina a qué categoría pertenece el archivo según su nombre y estilo de codificación."""
     fn = filename.lower()
     
-    # Evalúa si contiene indicadores de competencia como una palabra aislada o guiones: "c", "com", "comp", etc.
     is_competencia = False
     if re.search(r'\b(c|com|comp|competencia|competencias|changan)\b', fn) or "_c" in fn or "-c" in fn:
         is_competencia = True
@@ -126,60 +169,29 @@ def get_client_category(filename):
     return None
 
 def build_conteo_df(filename, av_count, grafica_count):
-    """Construye un DataFrame con el formato y orden exacto para la hoja de conteos."""
+    """Construye un DataFrame con el formato y orden para un archivo aplicando reglas de replicación."""
     matched_client = get_client_category(filename)
     
-    conteo_template = [
-        ("Chery 01-18 | |19-31", "Codificación Audiovisuales", "ANCHERY"),
-        ("Chery 01-18 | |19-31", "Codificación Impresos", "ANCHERY"),
-        ("Chery 01-18 | |19-31", "Notas Audiovisuales", "ANCHERY"),
-        ("Chery 01-18 | |19-31", "Notas Impresos", "ANCHERY"),
-        ("Chery - Changan, Competencias", "Codificación Audiovisuales", "ANCHERY"),
-        ("Chery - Changan, Competencias", "Codificación Impresos", "ANCHERY"),
-        ("Chery - Changan, Competencias", "Notas Audiovisuales", "ANCHERY"),
-        ("Chery - Changan, Competencias", "Notas Impresos", "ANCHERY"),
-        ("Comfenalco Valle", "Codificación Audiovisuales", "ACOMFEVALLE"),
-        ("Comfenalco Valle", "Codificación Impresos", "ACOMFEVALLE"),
-        ("Comfenalco Valle", "Notas Audiovisuales", "ACOMFEVALLE"),
-        ("Comfenalco Valle", "Notas Impresos", "ACOMFEVALLE"),
-        ("Federación Nacional de Avicultores de Colombia", "Codificación Audiovisuales", "ANFENAVI"),
-        ("Federación Nacional de Avicultores de Colombia", "Codificación Impresos", "ANFENAVI"),
-        ("Federación Nacional de Avicultores de Colombia", "Notas Audiovisuales", "ANFENAVI"),
-        ("Federación Nacional de Avicultores de Colombia", "Notas Impresos", "ANFENAVI"),
-        ("Fundación Santa Fe de Bogotá", "Codificación Audiovisuales", "FSANTAFE_AN"),
-        ("Fundación Santa Fe de Bogotá", "Codificación Impresos", "FSANTAFE_AN"),
-        ("Fundación Santa Fe de Bogotá", "Notas Audiovisuales", "FSANTAFE_AN"),
-        ("Fundación Santa Fe de Bogotá", "Notas Impresos", "FSANTAFE_AN"),
-        ("Nissan", "Codificación Audiovisuales", "ANNISSAN"),
-        ("Nissan", "Codificación Impresos", "ANNISSAN"),
-        ("Nissan", "Notas Audiovisuales", "ANNISSAN"),
-        ("Nissan", "Notas Impresos", "ANNISSAN"),
-        ("Nissan, Competencia", "Codificación Audiovisuales", "ANNISSAN"),
-        ("Nissan, Competencia", "Codificación Impresos", "ANNISSAN"),
-        ("Nissan, Competencia", "Notas Audiovisuales", "ANNISSAN"),
-        ("Nissan, Competencia", "Notas Impresos", "ANNISSAN"),
-        ("Tigo", "Codificación Audiovisuales", "TIGOAN"),
-        ("Tigo", "Codificación Impresos", "TIGOAN"),
-        ("Tigo", "Notas Audiovisuales", "TIGOAN"),
-        ("Tigo", "Notas Impresos", "TIGOAN"),
-        ("Universidad Simón Bolívar", "Codificación Audiovisuales", "USIMONAN"),
-        ("Universidad Simón Bolívar", "Codificación Impresos", "USIMONAN"),
-        ("Universidad Simón Bolívar", "Notas Audiovisuales", "USIMONAN"),
-        ("Universidad Simón Bolívar", "Notas Impresos", "USIMONAN"),
-        ("Universidad Tecnológica de Bolívar", "Codificación Audiovisuales", "UTB_AN"),
-        ("Universidad Tecnológica de Bolívar", "Codificación Impresos", "UTB_AN"),
-        ("Universidad Tecnológica de Bolívar", "Notas Audiovisuales", "UTB_AN"),
-        ("Universidad Tecnológica de Bolívar", "Notas Impresos", "UTB_AN")
-    ]
-    
     rows = []
-    for client, tipo, codigo in conteo_template:
+    for client, tipo, codigo in CONTEO_TEMPLATE:
         val = 0
+        is_replicated_client = client in [
+            "Chery 01-18 | |19-31",
+            "Chery - Changan, Competencias",
+            "Nissan",
+            "Nissan, Competencia"
+        ]
+        
         if client == matched_client:
             if tipo == "Notas Audiovisuales":
                 val = av_count
             elif tipo == "Notas Impresos":
                 val = grafica_count
+            elif tipo == "Codificación Audiovisuales":
+                val = av_count if is_replicated_client else 0
+            elif tipo == "Codificación Impresos":
+                val = grafica_count if is_replicated_client else 0
+        
         rows.append({
             "Cliente / Categoría": client,
             "Tipo de Conteo": tipo,
@@ -188,6 +200,72 @@ def build_conteo_df(filename, av_count, grafica_count):
         })
         
     return pd.DataFrame(rows), matched_client
+
+def build_consolidated_conteo(processed_files):
+    """Genera una tabla de conteo acumulando todos los archivos con sus respectivas reglas aplicadas."""
+    client_av = {}
+    client_graf = {}
+    
+    for item in processed_files:
+        matched_client = get_client_category(item['filename'])
+        if matched_client:
+            client_av[matched_client] = client_av.get(matched_client, 0) + item['av_count']
+            client_graf[matched_client] = client_graf.get(matched_client, 0) + item['grafica_count']
+            
+    rows = []
+    for client, tipo, codigo in CONTEO_TEMPLATE:
+        val = 0
+        av_count = client_av.get(client, 0)
+        graf_count = client_graf.get(client, 0)
+        
+        is_replicated_client = client in [
+            "Chery 01-18 | |19-31",
+            "Chery - Changan, Competencias",
+            "Nissan",
+            "Nissan, Competencia"
+        ]
+        
+        if tipo == "Notas Audiovisuales":
+            val = av_count
+        elif tipo == "Notas Impresos":
+            val = graf_count
+        elif tipo == "Codificación Audiovisuales":
+            val = av_count if is_replicated_client else 0
+        elif tipo == "Codificación Impresos":
+            val = graf_count if is_replicated_client else 0
+            
+        rows.append({
+            "Cliente / Categoría": client,
+            "Tipo de Conteo": tipo,
+            "Código": codigo,
+            "Cantidad": val
+        })
+        
+    return pd.DataFrame(rows)
+
+def to_excel_consolidated(df_conteo):
+    """Genera un archivo Excel exclusivo para la tabla consolidada de conteos."""
+    output = io.BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Conteo Consolidado"
+    
+    for col_idx, col_name in enumerate(df_conteo.columns, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.font = Font(bold=True)
+        
+    for row_idx, row_data in enumerate(df_conteo.itertuples(index=False), start=2):
+        for col_idx, val in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+            
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = col[0].column_letter
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+        
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
 
 def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
     output = io.BytesIO()
@@ -237,7 +315,7 @@ def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
         else:
             ws.column_dimensions[letter].width = 20
 
-    # 2. Hoja "Conteo" (pestaña adicional)
+    # 2. Hoja "Conteo" (pestaña adicional propia del archivo)
     ws2 = wb.create_sheet(title='Conteo')
     df_conteo, _ = build_conteo_df(filename, av_count, grafica_count)
     
@@ -456,46 +534,72 @@ if uploaded_dossiers:
     nombres = [f.name for f in uploaded_dossiers]
     st.info(f"{len(uploaded_dossiers)} archivo(s) cargado(s): {', '.join(nombres)}")
 
-# --- Resultados previos persistentes ---
+# --- Resultados previos persistentes estructurados en Pestañas Estándar ---
 if st.session_state.get('resultados'):
     st.markdown("---")
-    col_title, col_clear = st.columns([6, 1])
-    col_title.subheader("📊 Conteos por archivo")
-    if col_clear.button("🗑️ Borrar consultas", type="secondary"):
-        st.session_state['resultados'] = []
-        st.session_state['uploader_key'] += 1
-        st.rerun()
+    
+    # Creamos las dos pestañas solicitadas en la interfaz de usuario
+    tab_archivos, tab_consolidado = st.tabs(["📋 Detalle por Archivo", "📊 Conteo Total Consolidado"])
+    
+    with tab_archivos:
+        col_title, col_clear = st.columns([6, 1])
+        col_title.subheader("Detalle de Archivos")
+        if col_clear.button("🗑️ Borrar consultas", type="secondary"):
+            st.session_state['resultados'] = []
+            st.session_state['uploader_key'] += 1
+            st.rerun()
 
-    for r in st.session_state['resultados']:
-        with st.container():
-            col_nombre, col_graf, col_av, col_total, col_check, col_dl = st.columns([3, 1, 1, 1, 1, 1])
-            col_nombre.markdown(f"**{r['nombre']}**")
-            col_graf.metric("🗞️ Gráficas", r['graficas'])
-            col_av.metric("🎬 AV", r['av'])
-            col_total.metric("Total", r['total'])
-            
-            descargar = col_check.checkbox("Descargar", value=False, key=f"chk_{r['nombre']}")
-            if descargar:
-                col_dl.download_button(
-                    label="📥 Descargar Excel",
-                    data=r['excel'],
-                    file_name=r['filename'],
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"dl_{r['nombre']}"
-                )
-            
-            # Notificación visual del cliente detectado para confirmación
-            if r.get('matched_client'):
-                st.success(f"🎯 Cliente detectado: **{r['matched_client']}**")
-            else:
-                st.warning("⚠️ No se pudo auto-detectar el cliente en este archivo. Todos los conteos en la pestaña 'Conteo' serán 0.")
-            
-            # Comprobación de seguridad para evitar KeyError con sesiones previas
-            if 'conteo_df' in r:
-                with st.expander(f"👁️ Vista previa de la pestaña Conteo para {r['nombre']}"):
-                    st.dataframe(r['conteo_df'], use_container_width=True, hide_index=True)
+        for r in st.session_state['resultados']:
+            with st.container():
+                col_nombre, col_graf, col_av, col_total, col_check, col_dl = st.columns([3, 1, 1, 1, 1, 1])
+                col_nombre.markdown(f"**{r['nombre']}**")
+                col_graf.metric("🗞️ Gráficas", r['graficas'])
+                col_av.metric("🎬 AV", r['av'])
+                col_total.metric("Total", r['total'])
                 
-            st.markdown("---")
+                descargar = col_check.checkbox("Descargar", value=False, key=f"chk_{r['nombre']}")
+                if descargar:
+                    col_dl.download_button(
+                        label="📥 Descargar Excel",
+                        data=r['excel'],
+                        file_name=r['filename'],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_{r['nombre']}"
+                    )
+                
+                if r.get('matched_client'):
+                    st.caption(f"🎯 Cliente detectado: **{r['matched_client']}**")
+                else:
+                    st.caption("⚠️ No se pudo auto-detectar el cliente en este archivo.")
+                st.markdown("---")
+                
+    with tab_consolidado:
+        st.subheader("📊 Conteo Total de Registros")
+        st.markdown("Tabla combinada y consolidada de los archivos procesados en el orden estándar de salida:")
+        
+        # Reunimos los datos acumulados de cada archivo procesado
+        listado_archivos = []
+        for r in st.session_state['resultados']:
+            listado_archivos.append({
+                'filename': r['nombre'],
+                'av_count': r['av'],
+                'grafica_count': r['graficas']
+            })
+            
+        df_consolidado = build_consolidated_conteo(listado_archivos)
+        
+        # Mostramos la tabla consolidada directamente
+        st.dataframe(df_consolidado, use_container_width=True, hide_index=True)
+        
+        # Generar botón para descargar el Excel únicamente de la tabla consolidada de conteos
+        excel_cons = to_excel_consolidated(df_consolidado)
+        st.download_button(
+            label="📥 Descargar Tabla Conteo Consolidada (Excel)",
+            data=excel_cons,
+            file_name=f"Conteo_Consolidado_SOV_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_total_consolidado"
+        )
 
 # --- Botón principal ---
 can_run = bool(uploaded_dossiers and config_source)
