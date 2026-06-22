@@ -120,61 +120,77 @@ def clean_cuerpo(text):
     text = re.sub(r'<[^>]+>', '', text)
     return text.strip()
 
+# ------------------------------------------------------------------------------
+# DETECCIÓN DE CLIENTE A PARTIR DEL NOMBRE DE ARCHIVO
+# ------------------------------------------------------------------------------
+# Convención recomendada de nombre de archivo:
+#   "<fecha> <CÓDIGO> [m|com]"
+#   Ejemplos: "19 FSANTAFE_AN", "19 ANCHERY m", "19 ANCHERY com",
+#             "19 ANNISSAN m", "19 ANNISSAN com", "19 TIGOAN"
+# El <CÓDIGO> es exactamente el que aparece en la columna "Código" de
+# CONTEO_TEMPLATE. "m" = marca, "com" (o "comp"/"competencia") = competencia.
+# Solo Chery y Nissan tienen variante de competencia.
+# ------------------------------------------------------------------------------
+
+# Código (en minúsculas) -> nombre de cliente en CONTEO_TEMPLATE.
+# Para Chery/Nissan se resuelve según is_competencia más abajo.
+_CODE_TO_CLIENT_SIMPLE = {
+    "acomfevalle": "Comfenalco Valle",
+    "anfenavi": "Federación Nacional de Avicultores de Colombia",
+    "fsantafe_an": "Fundación Santa Fe de Bogotá",
+    "tigoan": "Tigo",
+    "usimonan": "Universidad Simón Bolívar",
+    "utb_an": "Universidad Tecnológica de Bolívar",
+}
+
+# Palabras clave heredadas (heurística "best effort" para nombres de archivo
+# que no siguen la convención de Código exacto). Se comparan por SUBCADENA
+# (no por igualdad exacta) para evitar el bug de tokens cortados por "_".
+_LEGACY_KEYWORDS = {
+    "Comfenalco Valle": ["comfe", "comfenalco"],
+    "Federación Nacional de Avicultores de Colombia": ["fenavi", "avicultores", "avicola"],
+    "Fundación Santa Fe de Bogotá": ["fsant", "santa", "santafe"],
+    "Tigo": ["tigo"],
+    "Universidad Simón Bolívar": ["simon", "usimon", "usim"],
+    "Universidad Tecnológica de Bolívar": ["utb", "tecnologica"],
+}
+
 def get_client_category(filename):
-    """Determina a qué categoría pertenece el archivo según su nombre y estilo de codificación."""
-    # 1. Obtener nombre sin extensión en minúsculas
+    """Determina a qué categoría pertenece el archivo según su nombre."""
+    # 1. Nombre sin extensión, en minúsculas
     fn = Path(filename).stem.lower()
-    
-    # 2. Limpiar números iniciales, espacios, guiones y guiones bajos (ej: "18_chery_m" -> "chery_m")
+
+    # 2. Limpiar fecha inicial: números, espacios, guiones y guiones bajos
+    #    (ej: "19 chery m" -> "chery m", "19-06_FSANTAFE_AN" -> "fsantafe_an")
     fn_clean = re.sub(r'^[\d\s\-_]+', '', fn).strip()
-    
-    # 3. Tokenizar el nombre utilizando cualquier caracter no alfanumérico como separador
-    tokens = re.split(r'[^a-z0-9]', fn_clean)
-    tokens = [t.strip() for t in tokens if t.strip()]
-    
-    # 4. Determinar si es un archivo de competencia evaluando palabras completas
+
+    # 3. Tokens para detectar el sufijo marca/competencia. Aquí SÍ tokenizamos,
+    #    porque "m"/"com" deben ser palabras sueltas (separadas por espacio,
+    #    guion o guion bajo) y no subcadenas, para no disparar falsos positivos
+    #    (p. ej. "comfenalco" contiene "com" pero no es competencia).
+    tokens = [t for t in re.split(r'[^a-z0-9]', fn_clean) if t]
     comp_keywords = {"c", "com", "comp", "competencia", "competencias", "changan"}
     is_competencia = any(t in comp_keywords for t in tokens)
-    
-    # 5. Mapeo de clientes por coincidencia de tokens
-    # Chery / ANCHERY
-    if any(t in ["chery", "anchery"] for t in tokens):
-        if is_competencia:
-            return "Chery - Changan, Competencias"
-        else:
-            return "Chery 01-18 | |19-31"
-            
-    # Nissan / ANNISSAN
-    elif any(t in ["niss", "nissan", "annissan"] for t in tokens):
-        if is_competencia:
-            return "Nissan, Competencia"
-        else:
-            return "Nissan"
-            
-    # Comfenalco Valle
-    elif any(t in ["comfe", "comfenalco", "acomfevalle"] for t in tokens):
-        return "Comfenalco Valle"
-        
-    # Federación Nacional de Avicultores de Colombia
-    elif any(t in ["fenavi", "avicultores", "avicola", "anfenavi"] for t in tokens):
-        return "Federación Nacional de Avicultores de Colombia"
-        
-    # Fundación Santa Fe de Bogotá
-    elif any(t in ["fsant", "santa", "santafe", "fsantafe_an"] for t in tokens):
-        return "Fundación Santa Fe de Bogotá"
-        
-    # Tigo
-    elif any(t in ["tigo", "tigoan"] for t in tokens):
-        return "Tigo"
-        
-    # Universidad Simón Bolívar
-    elif any(t in ["simon", "usimon", "usim", "usimonan"] for t in tokens):
-        return "Universidad Simón Bolívar"
-        
-    # Universidad Tecnológica de Bolívar
-    elif any(t in ["utb", "tecnologica", "utb_an"] for t in tokens):
-        return "Universidad Tecnológica de Bolívar"
-        
+
+    # 4. Camino rápido: el código exacto aparece como subcadena del nombre
+    #    limpio (sin tokenizar, para que "fsantafe_an" no se rompa por el "_").
+    if "anchery" in fn_clean:
+        return "Chery - Changan, Competencias" if is_competencia else "Chery 01-18 | |19-31"
+    if "annissan" in fn_clean:
+        return "Nissan, Competencia" if is_competencia else "Nissan"
+    for code, client in _CODE_TO_CLIENT_SIMPLE.items():
+        if code in fn_clean:
+            return client
+
+    # 5. Fallback heurístico para nombres que no siguen la convención de Código.
+    if any(kw in t for t in tokens for kw in ["chery"]):
+        return "Chery - Changan, Competencias" if is_competencia else "Chery 01-18 | |19-31"
+    if any(kw in t for t in tokens for kw in ["niss", "nissan"]):
+        return "Nissan, Competencia" if is_competencia else "Nissan"
+    for client, kws in _LEGACY_KEYWORDS.items():
+        if any(kw in t for t in tokens for kw in kws):
+            return client
+
     return None
 
 def build_conteo_df(filename, av_count, grafica_count):
@@ -526,6 +542,19 @@ with st.expander("📋 Ver mapeo de columnas aplicado"):
 | Link Nota | URL Nota AV con .ar→.co (AV) / URL (Streaming - Imagen) (Gráfica) |
 | Link (Streaming - Imagen) | URL Nota |
 | Menciones - Empresa | Menciones - Empresa (AV) / Empresa rel. (Gráfica) — expandido por ; |
+""")
+
+with st.expander("🏷️ Convención recomendada para nombrar los archivos"):
+    st.markdown("""
+Para que la detección de cliente sea 100% confiable, nombrá cada archivo como:
+
+`<fecha> <CÓDIGO> [m|com]`
+
+- **CÓDIGO** debe ser exactamente uno de: `ANCHERY`, `ANNISSAN`, `ACOMFEVALLE`, `ANFENAVI`, `FSANTAFE_AN`, `TIGOAN`, `USIMONAN`, `UTB_AN`.
+- **m** = marca, **com** = competencia (solo aplica a `ANCHERY` y `ANNISSAN`).
+- Ejemplos: `19 ANCHERY m`, `19 ANCHERY com`, `19 ANNISSAN m`, `19 ANNISSAN com`, `19 FSANTAFE_AN`, `19 TIGOAN`.
+
+Si no usás el código exacto, la app intenta detectar el cliente por palabras clave en el nombre, pero esa vía es menos confiable.
 """)
 
 st.markdown("---")
