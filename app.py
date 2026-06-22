@@ -14,185 +14,249 @@ from pathlib import Path
 # CONFIGURACIÓN DE PÁGINA
 # ==============================================================================
 st.set_page_config(
-    page_title="SOV · Conteo v3",
+    page_title="SOV · Conteo y Codificación",
     page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+# Archivo para persistencia local automática
+BACKUP_FILE = "sov_backup_estado.json"
+
 # ==============================================================================
-# CSS — tema claro
+# ESTILOS CSS (Tema Claro Moderno y Profesional)
 # ==============================================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.stApp { background: #f8fafc; color: #1e293b; }
+html, body, [class*="css"] { 
+    font-family: 'Plus Jakarta Sans', sans-serif; 
+}
+.stApp { 
+    background: #fbfcfd; 
+    color: #1e293b; 
+}
 
+/* Contenedor del Sidebar */
 section[data-testid="stSidebar"] {
     background: #ffffff !important;
-    border-right: 1px solid #e2e8f0 !important;
+    border-right: 1px solid #f1f5f9 !important;
     min-width: 320px !important;
 }
 
-/* Header */
+/* Cabezote Principal */
 .sov-header {
-    background: linear-gradient(135deg, #1e3a5f 0%, #1a4a7a 60%, #1e3a5f 100%);
-    border-radius: 14px;
-    padding: 26px 34px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
     margin-bottom: 24px;
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
-.sov-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #60a5fa, #3b82f6, transparent);
+.sov-header h1 { 
+    font-size: 1.6rem; 
+    font-weight: 700; 
+    color: #0f172a; 
+    margin: 0 0 4px 0; 
+    letter-spacing: -0.02em; 
 }
-.sov-header h1 { font-size: 1.7rem; font-weight: 700; color: #f0f9ff; margin: 0 0 4px 0; letter-spacing: -0.02em; }
-.sov-header p  { color: #93c5fd; font-size: 0.86rem; margin: 0; }
+.sov-header p { 
+    color: #64748b; 
+    font-size: 0.88rem; 
+    margin: 0; 
+}
 .sov-badge {
     display: inline-block;
-    background: #ffffff18;
-    border: 1px solid #ffffff30;
-    color: #bfdbfe;
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #2563eb;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.67rem;
-    padding: 2px 10px;
-    border-radius: 20px;
-    margin-bottom: 8px;
-    letter-spacing: 0.1em;
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-weight: 600;
     text-transform: uppercase;
 }
 
-/* Paso numerado */
+/* Tarjetas de Pasos */
 .step-block {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 18px 22px;
-    margin-bottom: 14px;
-    box-shadow: 0 1px 3px #1e293b08;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.01);
 }
-.step-block .step-label {
+.step-label {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    gap: 12px;
 }
 .step-num {
-    background: #1d4ed8;
+    background: #2563eb;
     color: #ffffff;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 700;
-    width: 24px; height: 24px;
-    border-radius: 50%;
+    width: 24px; 
+    height: 24px;
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    margin-top: 2px;
 }
-.step-num.done { background: #16a34a; }
-.step-num.warn { background: #d97706; }
-.step-title { font-weight: 600; font-size: 0.88rem; color: #1e293b; }
-.step-desc  { font-size: 0.78rem; color: #64748b; margin: 0; }
+.step-num.done { 
+    background: #10b981; 
+}
+.step-title { 
+    font-weight: 600; 
+    font-size: 0.95rem; 
+    color: #0f172a; 
+    margin-bottom: 4px;
+}
+.step-desc { 
+    font-size: 0.82rem; 
+    color: #64748b; 
+    margin: 0; 
+}
 
-/* Tarjetas de métricas */
+/* Indicadores Métricos */
 .metric-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 10px;
     padding: 16px;
     text-align: center;
-    box-shadow: 0 1px 3px #1e293b08;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.01);
 }
-.metric-card .mv { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 700; color: #1d4ed8; display: block; line-height: 1; }
-.metric-card .ml { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 5px; display: block; }
-
-/* Tarjeta de archivo */
-.file-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
-    box-shadow: 0 1px 2px #1e293b06;
+.metric-card .mv { 
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 1.6rem; 
+    font-weight: 700; 
+    color: #2563eb; 
+    display: block; 
+    line-height: 1; 
 }
-.file-card .fn { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #475569; margin-bottom: 5px; }
-.client-tag { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 0.7rem; padding: 2px 10px; border-radius: 20px; font-weight: 500; }
-.warn-tag   { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.7rem; padding: 2px 10px; border-radius: 20px; }
+.metric-card .ml { 
+    font-size: 0.72rem; 
+    color: #64748b; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-top: 6px; 
+    display: block; 
+    font-weight: 500;
+}
 
-/* Bloque de cliente en codificación manual */
+/* Alertas y Notificaciones */
+.info-box { 
+    background: #f0fdf4; 
+    border: 1px solid #bbf7d0; 
+    border-radius: 8px; 
+    padding: 12px 16px; 
+    font-size: 0.82rem; 
+    color: #166534; 
+    margin-bottom: 16px; 
+}
+.warn-box { 
+    background: #fffbeb; 
+    border: 1px solid #fde68a; 
+    border-radius: 8px; 
+    padding: 12px 16px; 
+    font-size: 0.82rem; 
+    color: #92400e; 
+    margin-bottom: 16px; 
+}
+
+/* Bloques de clientes para codificación */
 .mc-block {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-left: 3px solid #3b82f6;
-    border-radius: 10px;
-    padding: 12px 16px 4px 16px;
+    background: #f8fafc;
+    border-left: 3px solid #cbd5e1;
+    border-radius: 0 8px 8px 0;
+    padding: 8px 12px;
+    margin-top: 14px;
     margin-bottom: 8px;
 }
-.mc-block h4 { color: #1e40af; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 8px 0; }
-
-/* Info box */
-.info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 11px 15px; font-size: 0.81rem; color: #1e40af; margin-bottom: 12px; }
-.warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 11px 15px; font-size: 0.81rem; color: #92400e; margin-bottom: 12px; }
-.ok-box   { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 11px 15px; font-size: 0.81rem; color: #166534; margin-bottom: 12px; }
-
-/* JSON panel en sidebar */
-.json-panel {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
+.mc-block h4 { 
+    color: #334155; 
+    font-size: 0.8rem; 
+    font-weight: 600; 
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
-.json-panel h4 { font-size: 0.78rem; font-weight: 600; color: #374151; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.05em; }
-.json-status { font-size: 0.74rem; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
-.json-status.loaded { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.json-status.empty  { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
 
-/* Guía de orden */
-.order-guide { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-.og-row { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid #f1f5f9; gap: 8px; }
+/* Guía de Orden Estándar */
+.order-guide { 
+    background: #ffffff; 
+    border: 1px solid #e2e8f0; 
+    border-radius: 8px; 
+    overflow: hidden; 
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 0.75rem; 
+}
+.og-row { 
+    display: flex; 
+    align-items: center; 
+    padding: 8px 12px; 
+    border-bottom: 1px solid #f1f5f9; 
+    gap: 8px; 
+}
 .og-row:last-child { border-bottom: none; }
 .og-row:nth-child(even) { background: #f8fafc; }
-.og-row:nth-child(odd)  { background: #ffffff; }
 .og-row.hl { background: #eff6ff !important; }
-.og-row.hdr { background: #1e3a5f !important; }
-.og-num  { color: #94a3b8; width: 20px; text-align: right; flex-shrink: 0; font-size: 0.68rem; }
-.og-tipo { color: #475569; width: 200px; flex-shrink: 0; font-size: 0.73rem; }
-.og-cli  { color: #1e293b; flex: 1; font-size: 0.72rem; }
-.og-cod  { color: #94a3b8; font-size: 0.67rem; }
-.hdr .og-num, .hdr .og-tipo, .hdr .og-cli, .hdr .og-cod { color: #e0f2fe !important; font-weight: 600; }
-.hl .og-tipo { color: #1d4ed8 !important; font-weight: 600; }
+.og-row.hdr { background: #0f172a !important; color: #ffffff !important; }
+.og-num { color: #94a3b8; width: 24px; text-align: right; }
+.og-tipo { color: #334155; width: 220px; font-weight: 500; }
+.og-cli { color: #0f172a; flex: 1; }
+.og-cod { color: #64748b; font-size: 0.7rem; }
+.hdr .og-num, .hdr .og-tipo, .hdr .og-cli, .hdr .og-cod { color: #ffffff !important; font-weight: 600; }
 
 /* Tabs */
-.stTabs [data-baseweb="tab-list"] { background: #f1f5f9; border-radius: 10px; padding: 3px; border: 1px solid #e2e8f0; gap: 2px; }
-.stTabs [data-baseweb="tab"] { background: transparent; border-radius: 8px; color: #64748b; font-size: 0.81rem; font-weight: 500; padding: 7px 15px; border: none !important; }
-.stTabs [aria-selected="true"] { background: #ffffff !important; color: #1d4ed8 !important; box-shadow: 0 1px 4px #1e293b14; }
+.stTabs [data-baseweb="tab-list"] { 
+    background: #f1f5f9; 
+    border-radius: 8px; 
+    padding: 4px; 
+    border: none;
+    gap: 4px; 
+}
+.stTabs [data-baseweb="tab"] { 
+    background: transparent; 
+    border-radius: 6px; 
+    color: #64748b; 
+    font-size: 0.82rem; 
+    font-weight: 500; 
+    padding: 8px 16px; 
+    border: none !important; 
+}
+.stTabs [aria-selected="true"] { 
+    background: #ffffff !important; 
+    color: #2563eb !important; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+}
 
-/* Botones */
-.stButton > button[kind="primary"] { background: #1d4ed8 !important; border: none !important; border-radius: 8px !important; color: white !important; font-weight: 600 !important; font-size: 0.83rem !important; padding: 9px 20px !important; }
-.stButton > button[kind="primary"]:hover { background: #1e40af !important; }
-.stButton > button[kind="secondary"] { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; color: #475569 !important; font-weight: 500 !important; font-size: 0.81rem !important; }
-.stDownloadButton > button { background: #ffffff !important; border: 1px solid #bfdbfe !important; border-radius: 8px !important; color: #1d4ed8 !important; font-size: 0.79rem !important; font-weight: 500 !important; width: 100%; }
-.stDownloadButton > button:hover { background: #eff6ff !important; border-color: #3b82f6 !important; }
-
-/* Inputs */
-div[data-testid="stNumberInput"] input { background: #f8fafc !important; border-color: #e2e8f0 !important; color: #1e293b !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; }
-textarea { background: #f8fafc !important; border-color: #e2e8f0 !important; color: #1d4ed8 !important; font-family: 'JetBrains Mono', monospace !important; font-size: 0.84rem !important; line-height: 2 !important; }
-div[data-testid="stFileUploader"] { background: #ffffff !important; border: 1.5px dashed #bfdbfe !important; border-radius: 10px !important; }
-
-hr { border-color: #e2e8f0 !important; margin: 18px 0 !important; }
+/* Personalización de Inputs */
+div[data-testid="stNumberInput"] input { 
+    background: #ffffff !important; 
+    border-color: #cbd5e1 !important; 
+    color: #0f172a !important; 
+    border-radius: 6px !important; 
+}
+textarea { 
+    background: #ffffff !important; 
+    border-color: #cbd5e1 !important; 
+    color: #0f172a !important; 
+    font-family: 'JetBrains Mono', monospace !important; 
+    font-size: 0.85rem !important; 
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# CONSTANTES
+# CONSTANTES Y ESTRUCTURA DEL CONTEO (40 Filas en orden específico)
 # ==============================================================================
 CONTEO_TEMPLATE = [
     ("Chery 01-18 | |19-31",                          "Codificación Audiovisuales", "ANCHERY"),
@@ -207,10 +271,10 @@ CONTEO_TEMPLATE = [
     ("Comfenalco Valle",                              "Codificación Impresos",      "ACOMFEVALLE"),
     ("Comfenalco Valle",                              "Notas Audiovisuales",        "ACOMFEVALLE"),
     ("Comfenalco Valle",                              "Notas Impresos",             "ACOMFEVALLE"),
-    ("Federación Nacional de Avicultores de Colombia","Codificación Audiovisuales", "ANFENAVI"),
-    ("Federación Nacional de Avicultores de Colombia","Codificación Impresos",      "ANFENAVI"),
-    ("Federación Nacional de Avicultores de Colombia","Notas Audiovisuales",        "ANFENAVI"),
-    ("Federación Nacional de Avicultores de Colombia","Notas Impresos",             "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Codificación Audiovisuales", "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Codificación Impresos",      "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Notas Audiovisuales",        "ANFENAVI"),
+    ("Federación Nacional de Avicultores de Colombia", "Notas Impresos",             "ANFENAVI"),
     ("Fundación Santa Fe de Bogotá",                  "Codificación Audiovisuales", "FSANTAFE_AN"),
     ("Fundación Santa Fe de Bogotá",                  "Codificación Impresos",      "FSANTAFE_AN"),
     ("Fundación Santa Fe de Bogotá",                  "Notas Audiovisuales",        "FSANTAFE_AN"),
@@ -237,7 +301,7 @@ CONTEO_TEMPLATE = [
     ("Universidad Tecnológica de Bolívar",            "Notas Impresos",             "UTB_AN"),
 ]
 
-UNIQUE_CLIENTS   = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
+UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
 REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia"}
 
 _CODE_MAP = {
@@ -248,6 +312,7 @@ _CODE_MAP = {
     "usimonan":    "Universidad Simón Bolívar",
     "utb_an":      "Universidad Tecnológica de Bolívar",
 }
+
 _LEGACY = {
     "Comfenalco Valle":                               ["comfe","comfenalco"],
     "Federación Nacional de Avicultores de Colombia": ["fenavi","avicultores","avicola"],
@@ -258,9 +323,27 @@ _LEGACY = {
 }
 
 # ==============================================================================
-# FUNCIONES
+# PERSISTENCIA LOCAL DE ESTADO (Backup automático de datos manuales)
 # ==============================================================================
+def save_local_backup(data):
+    try:
+        with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
+def load_local_backup():
+    if Path(BACKUP_FILE).exists():
+        try:
+            with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+# ==============================================================================
+# FUNCIONES AUXILIARES DE PROCESAMIENTO
+# ==============================================================================
 def find_config_path():
     base = Path(__file__).parent
     for f in base.iterdir():
@@ -270,10 +353,8 @@ def find_config_path():
 
 CONFIG_PATH = find_config_path()
 
-
 def extract_link_from_cell(cell):
     return cell.hyperlink.target if cell.hyperlink and cell.hyperlink.target else None
-
 
 def convert_html_entities(text):
     if not isinstance(text, str): return text
@@ -299,11 +380,14 @@ def clean_cuerpo(t):
     return t.strip()
 
 def get_client_category(filename):
-    fn = re.sub(r'^[\d\s\-_]+', '', Path(filename).stem.lower()).strip()
+    fn = re.sub(r'^[\d\s\-_]+', '', Path(filename).name.lower()).strip()
     tokens = [t for t in re.split(r'[^a-z0-9]', fn) if t]
     comp = any(t in {"c","com","comp","competencia","competencias","changan"} for t in tokens)
-    if "anchery"  in fn: return "Chery - Changan, Competencias" if comp else "Chery 01-18 | |19-31"
-    if "annissan" in fn: return "Nissan, Competencia" if comp else "Nissan"
+    
+    if "anchery" in fn: 
+        return "Chery - Changan, Competencias" if comp else "Chery 01-18 | |19-31"
+    if "annissan" in fn: 
+        return "Nissan, Competencia" if comp else "Nissan"
     for code, client in _CODE_MAP.items():
         if code in fn: return client
     if any(kw in t for t in tokens for kw in ["chery"]):
@@ -317,28 +401,45 @@ def get_client_category(filename):
 def build_consolidated_conteo(processed_files, manual_codif=None):
     mc = manual_codif or {}
     cav, cgraf = {}, {}
+    
+    # Sumar automáticamente los dossiers procesados
     for item in processed_files:
         c = get_client_category(item['filename'])
         if c:
             cav[c]   = cav.get(c, 0)   + item['av_count']
             cgraf[c] = cgraf.get(c, 0) + item['grafica_count']
+            
     rows = []
     for client, tipo, codigo in CONTEO_TEMPLATE:
-        av   = cav.get(client, 0); gr = cgraf.get(client, 0)
+        av = cav.get(client, 0)
+        gr = cgraf.get(client, 0)
+        
         m_av = int(mc.get(client, {}).get('av', 0) or 0)
         m_im = int(mc.get(client, {}).get('impresos', 0) or 0)
         rep  = client in REPLICATED_CLIENTS
-        if   tipo == "Notas Audiovisuales":        val = av
-        elif tipo == "Notas Impresos":             val = gr
-        elif tipo == "Codificación Audiovisuales": val = (av if rep else 0) + m_av
-        elif tipo == "Codificación Impresos":      val = (gr if rep else 0) + m_im
-        else:                                      val = 0
-        rows.append({"Cliente / Categoría": client, "Tipo de Conteo": tipo, "Código": codigo, "Cantidad": val})
+        
+        if tipo == "Notas Audiovisuales":
+            val = av
+        elif tipo == "Notas Impresos":
+            val = gr
+        elif tipo == "Codificación Audiovisuales":
+            val = (av if rep else 0) + m_av
+        elif tipo == "Codificación Impresos":
+            val = (gr if rep else 0) + m_im
+        else:
+            val = 0
+            
+        rows.append({
+            "Cliente / Categoría": client, 
+            "Tipo de Conteo": tipo, 
+            "Código": codigo, 
+            "Cantidad": val
+        })
     return pd.DataFrame(rows)
 
 def to_excel_consolidated(df):
     out = io.BytesIO(); wb = Workbook(); ws = wb.active; ws.title = "Conteo Consolidado"
-    hf = PatternFill("solid", fgColor="1E3A5F"); hfont = Font(bold=True, color="FFFFFF", name="Calibri")
+    hf = PatternFill("solid", fgColor="2563EB"); hfont = Font(bold=True, color="FFFFFF", name="Calibri")
     bot = Border(bottom=Side(style='thin', color="E2E8F0")); alt = PatternFill("solid", fgColor="F8FAFC")
     for ci, cn in enumerate(df.columns, 1):
         c = ws.cell(row=1, column=ci, value=cn); c.font = hfont; c.fill = hf; c.border = bot
@@ -356,7 +457,7 @@ def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
     for col in df_out.columns:
         if hasattr(df_out[col].dtype, 'pyarrow_dtype'): df_out[col] = df_out[col].astype(object)
     wb = Workbook(); ws = wb.active; ws.title = 'Resultado'
-    hf = PatternFill("solid", fgColor="1E3A5F"); hfont = Font(bold=True, color="FFFFFF", name="Calibri")
+    hf = PatternFill("solid", fgColor="2563EB"); hfont = Font(bold=True, color="FFFFFF", name="Calibri")
     for i, cn in enumerate(df_out.columns, 1):
         c = ws.cell(row=1, column=i, value=cn); c.font = hfont; c.fill = hf
     lc = {'Link Nota','Link (Streaming - Imagen)'}
@@ -368,7 +469,7 @@ def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
                 else: cell.value = value
             elif cn in lc and pd.notna(value) and isinstance(value,str) and value.startswith('http'):
                 cell.value = 'Link'; cell.hyperlink = value
-                cell.font = Font(color="1D4ED8", underline="single"); cell.alignment = Alignment(horizontal='left')
+                cell.font = Font(color="2563EB", underline="single"); cell.alignment = Alignment(horizontal='left')
             else:
                 cell.value = value if pd.notna(value) else None
     for i, cn in enumerate(df_out.columns, 1):
@@ -456,312 +557,268 @@ def process_dossier(dossier_file, rmap, imap):
     return df, int(df['Tipo de Medio'].isin(['Radio','Televisión']).sum()), int(df['Tipo de Medio'].isin(['Prensa','Internet','Revistas']).sum())
 
 # ==============================================================================
-# SESSION STATE
+# INICIALIZACIÓN DE ESTADOS
 # ==============================================================================
-def _init():
-    for k, v in {
-        'uploader_key': 0,
-        'resultados':   [],
-        'manual_codif': {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS},
-        'manual_saved': False,
-        # Bandera para procesar el JSON importado SIN hacer rerun inmediato
-        '_json_pending': None,
-    }.items():
-        if k not in st.session_state: st.session_state[k] = v
+if 'uploader_key' not in st.session_state:
+    st.session_state['uploader_key'] = 0
 
-_init()
+if 'resultados' not in st.session_state:
+    st.session_state['resultados'] = []
 
-# Procesar JSON pendiente ANTES de renderizar (evita el bug de rerun)
-if st.session_state['_json_pending'] is not None:
-    try:
-        data = json.loads(st.session_state['_json_pending'])
-        st.session_state['manual_codif'] = {c: data.get(c, {'av':0,'impresos':0}) for c in UNIQUE_CLIENTS}
-        st.session_state['manual_saved']  = True
-    except Exception:
-        pass
-    st.session_state['_json_pending'] = None
+# Intentar recuperar el estado de codificación guardado automáticamente
+if 'manual_codif' not in st.session_state:
+    saved_data = load_local_backup()
+    if saved_data:
+        st.session_state['manual_codif'] = {c: saved_data.get(c, {'av': 0, 'impresos': 0}) for c in UNIQUE_CLIENTS}
+    else:
+        st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
 
 # ==============================================================================
-# HEADER
+# CABECERA PRINCIPAL
 # ==============================================================================
 st.markdown("""
 <div class="sov-header">
-    <div class="sov-badge">📡 Media Intelligence · SOV</div>
-    <h1>Conteo v3</h1>
-    <p>Procesa dossiers de monitoreo, calcula conteos y consolida la codificación manual por cliente.</p>
+    <div class="sov-badge">Sistema Integrado · SOV</div>
+    <h1>Conteo y Consolidación de Dossiers</h1>
+    <p>Procese los archivos de monitoreo y consolide las métricas con su codificación manual acumulada.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# SIDEBAR — Configuración + JSON
+# SIDEBAR (Control de Configuración y Respaldo Externo)
 # ==============================================================================
 with st.sidebar:
-
-    # --- Config ---
-    st.markdown("### ⚙️ Configuración")
+    st.markdown("### ⚙️ Configuración del Sistema")
+    
+    # Detección de Configuración
     config_source = None
     if CONFIG_PATH is not None:
-        st.success(f"✅ `{CONFIG_PATH.name}` detectado")
+        st.success(f"📂 Archivo de marcas detectado:\n`{CONFIG_PATH.name}`")
         config_source = CONFIG_PATH
     else:
-        st.warning("No se encontró `Configuracion.xlsx` en el repositorio.")
-        cfg_up = st.file_uploader("Subir Configuracion.xlsx", type=["xlsx"], key="cfg_up")
-        if cfg_up: config_source = cfg_up; st.success(f"✅ {cfg_up.name}")
+        st.warning("No se encontró `Configuracion.xlsx` en la carpeta base.")
+        cfg_up = st.file_uploader("Cargue el archivo de configuración (.xlsx)", type=["xlsx"], key="cfg_up")
+        if cfg_up:
+            config_source = cfg_up
+            st.success(f"✅ Cargado: {cfg_up.name}")
 
     st.markdown("---")
-
-    # --- Panel JSON ---
-    st.markdown("### 💾 Guardar / restaurar codificación")
-
-    # Estado actual
-    tiene_datos = any(
-        (v.get('av',0) or 0) + (v.get('impresos',0) or 0) > 0
-        for v in st.session_state['manual_codif'].values()
-    )
-    if tiene_datos:
-        tot_av  = sum(v.get('av',0) or 0       for v in st.session_state['manual_codif'].values())
-        tot_imp = sum(v.get('impresos',0) or 0 for v in st.session_state['manual_codif'].values())
-        st.markdown(
-            f'<div class="json-panel">'
-            f'<h4>Codificación en memoria</h4>'
-            f'<span class="json-status loaded">✅ Cargada — AV: {tot_av} | Impresos: {tot_imp}</span>'
-            f'<p style="font-size:0.74rem;color:#374151;margin:4px 0 0 0;">'
-            f'Estos valores se están sumando al conteo consolidado.</p>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+    st.markdown("### 💾 Guardar / Cargar Sesión")
+    
+    # Indicador visual del estado de memoria
+    codigos_activos = sum((v.get('av',0) + v.get('impresos',0) > 0) for v in st.session_state['manual_codif'].values())
+    
+    if codigos_activos > 0:
+        st.info(f"✨ Memoria Activa: {codigos_activos} cliente(s) con valores cargados.")
     else:
-        st.markdown(
-            '<div class="json-panel">'
-            '<h4>Codificación en memoria</h4>'
-            '<span class="json-status empty">Sin datos ingresados aún</span>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        st.caption("No hay valores manuales en memoria actualmente.")
 
-    # Exportar
+    # Exportación manual de seguridad
     json_bytes = json.dumps(st.session_state['manual_codif'], ensure_ascii=False, indent=2).encode('utf-8')
     st.download_button(
-        "⬇️ Exportar JSON (guardar para mañana)",
+        "⬇️ Descargar Copia de Respaldo (.json)",
         data=json_bytes,
-        file_name=f"codif_manual_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.json",
+        file_name=f"sov_codif_manual_{datetime.datetime.now().strftime('%Y%m%d')}.json",
         mime="application/json",
-        key="dl_json_sidebar",
         use_container_width=True,
-        help="Descargue este archivo al finalizar su sesión. Mañana impórtelo aquí abajo para restaurar los valores.",
+        help="Guarde una copia externa para importarla en cualquier momento o equipo."
     )
 
-    # Importar — sin rerun inmediato
-    st.markdown("**Importar JSON de sesión anterior:**")
+    # Importación de archivo externo
+    st.markdown("**Cargar Respaldo Externo:**")
     json_up = st.file_uploader(
-        "Seleccione el archivo .json guardado",
+        "Subir archivo .json",
         type=["json"],
-        key="json_up_sidebar",
-        label_visibility="collapsed",
-        help="Seleccione el archivo .json que exportó en una sesión anterior.",
+        key="json_uploader_sidebar",
+        label_visibility="collapsed"
     )
     if json_up is not None:
-        raw = json_up.read().decode('utf-8')
-        if st.session_state['_json_pending'] != raw:
-            st.session_state['_json_pending'] = raw
+        try:
+            imported_data = json.loads(json_up.read().decode('utf-8'))
+            st.session_state['manual_codif'] = {c: imported_data.get(c, {'av':0,'impresos':0}) for c in UNIQUE_CLIENTS}
+            save_local_backup(st.session_state['manual_codif'])
+            st.success("Copia de seguridad restaurada de forma exitosa.")
             st.rerun()
-
-    if st.session_state.get('manual_saved') and tiene_datos:
-        st.success("Codificación importada y activa.")
-
-    st.markdown("---")
-
-    # --- Convención de nombres ---
-    with st.expander("📋 Convención de nombres de archivo"):
-        st.caption(
-            "Formato: `<fecha> <CÓDIGO> [m|com]`\n\n"
-            "Ejemplos:\n"
-            "- `19 ANCHERY m` → Chery (marca)\n"
-            "- `19 ANCHERY com` → Chery (competencia)\n"
-            "- `19 ANNISSAN m` → Nissan (marca)\n"
-            "- `19 FSANTAFE_AN` → Fundación Santa Fe\n\n"
-            "Códigos válidos: `ANCHERY`, `ANNISSAN`, `ACOMFEVALLE`, `ANFENAVI`, "
-            "`FSANTAFE_AN`, `TIGOAN`, `USIMONAN`, `UTB_AN`"
-        )
+        except Exception as e:
+            st.error(f"Error al leer el archivo JSON: {e}")
 
     st.markdown("---")
-    if st.button("🗑️ Limpiar resultados procesados", type="secondary", use_container_width=True):
+    if st.button("🗑️ Reiniciar Sesión", type="secondary", use_container_width=True):
         st.session_state['resultados'] = []
+        st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
+        save_local_backup(st.session_state['manual_codif'])
         st.session_state['uploader_key'] += 1
         st.rerun()
 
 # ==============================================================================
-# CUERPO — Pasos de uso
+# PANEL PRINCIPAL (FLUJO PASO A PASO)
 # ==============================================================================
 
-# ── PASO 1: Codificación manual ────────────────────────────────────────────────
-tiene_manual = any(
-    (v.get('av',0) or 0) + (v.get('impresos',0) or 0) > 0
-    for v in st.session_state['manual_codif'].values()
-)
-paso1_num_class = "done" if tiene_manual else "warn" if not tiene_manual else ""
+# ──────────────────────────────────────────────────────────────────────────────
+# PASO 1: Codificación Manual (Persistente)
+# ──────────────────────────────────────────────────────────────────────────────
+tiene_manual = any((v.get('av',0) or 0) + (v.get('impresos',0) or 0) > 0 for v in st.session_state['manual_codif'].values())
 
 st.markdown(f"""
 <div class="step-block">
   <div class="step-label">
-    <span class="step-num {'done' if tiene_manual else ''}">{1}</span>
+    <span class="step-num {'done' if tiene_manual else ''}">1</span>
     <div>
-      <div class="step-title">Codificación manual {'✅' if tiene_manual else ''}</div>
-      <p class="step-desc">Si ya tiene notas codificadas de períodos anteriores, ingréselas aquí antes de procesar los dossiers.
-      Si viene de una sesión anterior, restaure el JSON desde el panel lateral.</p>
+      <div class="step-title">Codificación Manual de Notas {'' if not tiene_manual else '✓'}</div>
+      <p class="step-desc">Registre los acumulados ya analizados de periodos previos. Se conservarán automáticamente para sus próximas sesiones.</p>
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-with st.expander("✏️ Ingresar / revisar codificación manual", expanded=not tiene_manual):
-
-    # Guía de orden
-    with st.expander("📖 ¿Qué valores van aquí y en qué orden aparecen en el conteo?", expanded=False):
-        st.markdown("""
-**Regla general:**
-
-| Fila en el conteo | ¿Quién la llena? |
-|---|---|
-| Codificación Audiovisuales | **Usted manualmente** (notas ya analizadas) |
-| Codificación Impresos | **Usted manualmente** (notas ya analizadas) |
-| Notas Audiovisuales | La app, automáticamente al procesar el dossier |
-| Notas Impresos | La app, automáticamente al procesar el dossier |
-
-**Excepción — Chery y Nissan:** la Codificación se autocompleta igual que las Notas (son "clientes replicados"). Solo ingrese un valor manual si tiene notas extra fuera del dossier.
-
-**Orden de las 40 filas:**
-""")
+with st.expander("✏️ Ver y Modificar Datos Manuales de Codificación", expanded=not tiene_manual):
+    st.markdown(
+        '<div class="warn-box">⚠️ <strong>Importante:</strong> Para los clientes <strong>Chery</strong> y <strong>Nissan</strong>, '
+        'el conteo automático ya incluye su codificación en base al archivo procesado. Registre cantidades manuales adicionales aquí solo si tiene notas '
+        'por fuera de los dossiers.</div>',
+        unsafe_allow_html=True
+    )
+    
+    # Botón para ver la guía de orden
+    with st.expander("📖 Estructura del Conteo (40 Filas en Orden Estándar)", expanded=False):
         rows_html = ""
         for i, (client, tipo, codigo) in enumerate(CONTEO_TEMPLATE, 1):
             hl = "og-row hl" if "Codificación" in tipo else "og-row"
-            rows_html += (
-                f'<div class="{hl}">'
-                f'<span class="og-num">{i}</span>'
-                f'<span class="og-tipo">{tipo}</span>'
-                f'<span class="og-cli">{client}</span>'
-                f'<span class="og-cod">{codigo}</span>'
-                f'</div>'
-            )
-        st.markdown(
-            '<div class="order-guide">'
-            '<div class="og-row hdr"><span class="og-num">#</span>'
-            '<span class="og-tipo">Tipo de Conteo</span>'
-            '<span class="og-cli">Cliente</span>'
-            '<span class="og-cod">Código</span></div>'
-            + rows_html + '</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption("Las filas resaltadas en azul son las de Codificación — las que usted ingresa aquí.")
+            rows_html += f'<div class="{hl}"><span class="og-num">{i}</span><span class="og-tipo">{tipo}</span><span class="og-cli">{client}</span><span class="og-cod">{codigo}</span></div>'
+        st.markdown(f'<div class="order-guide">{rows_html}</div>', unsafe_allow_html=True)
 
-    st.markdown(
-        '<div class="info-box">Los valores de Codificación se <strong>suman</strong> al conteo automático. '
-        'Ingrese el acumulado total que ya tiene analizado para cada cliente. '
-        'Si no tiene nada para un cliente, déjelo en 0.</div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.form("form_manual", clear_on_submit=False):
-        nuevos = {}
+    # Formulario para entrada de datos manuales
+    with st.form("form_manual_data"):
+        nuevos_valores = {}
         for client in UNIQUE_CLIENTS:
             st.markdown(f'<div class="mc-block"><h4>{client}</h4></div>', unsafe_allow_html=True)
-            ca, ci2 = st.columns(2)
-            act = st.session_state['manual_codif'].get(client, {'av':0,'impresos':0})
-            val_av = ca.number_input("🎬 Codif. Audiovisuales", min_value=0, step=1,
-                                     value=int(act.get('av',0) or 0), key=f"mav_{client}")
-            val_im = ci2.number_input("🗞️ Codif. Impresos",    min_value=0, step=1,
-                                     value=int(act.get('impresos',0) or 0), key=f"mim_{client}")
-            nuevos[client] = {'av': val_av, 'impresos': val_im}
-            st.markdown("")
+            col_av, col_imp = st.columns(2)
+            
+            valor_actual = st.session_state['manual_codif'].get(client, {'av': 0, 'impresos': 0})
+            
+            val_av = col_av.number_input(
+                "🎬 Audiovisuales Codificadas", 
+                min_value=0, step=1, 
+                value=int(valor_actual.get('av', 0)), 
+                key=f"input_av_{client}"
+            )
+            val_im = col_imp.number_input(
+                "🗞️ Impresas Codificadas", 
+                min_value=0, step=1, 
+                value=int(valor_actual.get('impresos', 0)), 
+                key=f"input_im_{client}"
+            )
+            nuevos_valores[client] = {'av': val_av, 'impresos': val_im}
 
-        cs, cr = st.columns([3, 1])
-        if cs.form_submit_button("💾 Guardar valores de codificación", type="primary", use_container_width=True):
-            st.session_state['manual_codif'] = nuevos
-            st.session_state['manual_saved']  = True
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn_save, col_btn_clear = st.columns([3, 1])
+        
+        if col_btn_save.form_submit_button("💾 Guardar Cambios y Actualizar Conteo", type="primary", use_container_width=True):
+            st.session_state['manual_codif'] = nuevos_valores
+            save_local_backup(nuevos_valores)
             st.rerun()
-        if cr.form_submit_button("🔄 Restablecer", use_container_width=True):
-            st.session_state['manual_codif'] = {c: {'av':0,'impresos':0} for c in UNIQUE_CLIENTS}
-            st.session_state['manual_saved']  = False
+            
+        if col_btn_clear.form_submit_button("🔄 Reestablecer a Cero", use_container_width=True):
+            vacio = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
+            st.session_state['manual_codif'] = vacio
+            save_local_backup(vacio)
             st.rerun()
 
-st.markdown("")
-
-# ── PASO 2: Cargar y procesar dossiers ────────────────────────────────────────
-tiene_resultados = bool(st.session_state.get('resultados'))
+# ──────────────────────────────────────────────────────────────────────────────
+# PASO 2: Procesar Nuevos Dossiers
+# ──────────────────────────────────────────────────────────────────────────────
+tiene_resultados = len(st.session_state['resultados']) > 0
 
 st.markdown(f"""
 <div class="step-block">
   <div class="step-label">
-    <span class="step-num {'done' if tiene_resultados else ''}">{2}</span>
+    <span class="step-num {'done' if tiene_resultados else ''}">2</span>
     <div>
-      <div class="step-title">Cargar y procesar dossiers {'✅' if tiene_resultados else ''}</div>
-      <p class="step-desc">Cargue los archivos .xlsx del dossier. La app detecta el cliente por el nombre del archivo
-      y calcula las Notas AV y Notas Impresos automáticamente.</p>
+      <div class="step-title">Carga y Procesamiento de Dossiers {'' if not tiene_resultados else '✓'}</div>
+      <p class="step-desc">Suba uno o varios archivos de monitoreo en formato Excel. El sistema identificará el cliente automáticamente.</p>
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-uploaded = st.file_uploader(
-    "Seleccione uno o varios archivos .xlsx",
-    type=["xlsx"], accept_multiple_files=True,
-    key=f"dos_{st.session_state['uploader_key']}",
-    label_visibility="collapsed",
+uploaded_files = st.file_uploader(
+    "Seleccione archivos .xlsx",
+    type=["xlsx"], 
+    accept_multiple_files=True,
+    key=f"uploader_dossiers_{st.session_state['uploader_key']}",
+    label_visibility="collapsed"
 )
 
-if uploaded:
+if uploaded_files:
     st.markdown(
-        f'<div class="info-box">📎 {len(uploaded)} archivo(s) listos para procesar: '
-        + ', '.join(f'<code>{f.name}</code>' for f in uploaded) + '</div>',
-        unsafe_allow_html=True,
+        f'<div class="info-box">📎 {len(uploaded_files)} archivo(s) cargado(s) y listos para procesar.</div>',
+        unsafe_allow_html=True
     )
 
-can_run = bool(uploaded and config_source)
-cb, ch = st.columns([2, 5])
-with cb:
-    run = st.button("▶ Procesar dossiers", disabled=not can_run, type="primary", use_container_width=True)
-with ch:
-    if not config_source:
-        st.caption("⚠️ Primero cargue `Configuracion.xlsx` en el panel lateral.")
-    elif not uploaded:
-        st.caption("Seleccione al menos un archivo .xlsx para continuar.")
+# Bloque de ejecución
+col_btn_run, col_status_run = st.columns([2, 5])
+habilitado = bool(uploaded_files and config_source)
 
-if run:
-    try: rmap, imap = load_config(config_source)
-    except Exception as e: st.error(f"Error cargando Configuracion.xlsx: {e}"); st.stop()
-    FINAL_ORDER = ["ID Noticia","Fecha","Hora","Medio","Tipo de Medio","Sección - Programa",
-                   "Región","Título","Autor - Conductor","Nro. Pagina","Dimensión",
-                   "Duración - Nro. Caracteres","CPE","Tier","Audiencia","Tono","Tema",
-                   "Temas Generales - Tema","Resumen - Aclaracion",
-                   "Link Nota","Link (Streaming - Imagen)","Menciones - Empresa"]
-    nuevos = []
-    pb = st.progress(0, text="Iniciando...")
-    for i, f in enumerate(uploaded):
-        pb.progress(i/len(uploaded), text=f"Procesando {f.name}...")
+with col_btn_run:
+    ejecutar = st.button("▶ Procesar Archivos", disabled=not habilitado, type="primary", use_container_width=True)
+
+with col_status_run:
+    if not config_source:
+        st.caption("⚠️ Requiere el archivo de configuración en el panel izquierdo para procesar.")
+    elif not uploaded_files:
+        st.caption("Seleccione al menos un archivo .xlsx para iniciar.")
+
+if ejecutar:
+    try:
+        rmap, imap = load_config(config_source)
+    except Exception as e:
+        st.error(f"Error al abrir el archivo de configuración: {e}")
+        st.stop()
+
+    FINAL_ORDER = [
+        "ID Noticia", "Fecha", "Hora", "Medio", "Tipo de Medio", "Sección - Programa",
+        "Región", "Título", "Autor - Conductor", "Nro. Pagina", "Dimensión",
+        "Duración - Nro. Caracteres", "CPE", "Tier", "Audiencia", "Tono", "Tema",
+        "Temas Generales - Tema", "Resumen - Aclaracion",
+        "Link Nota", "Link (Streaming - Imagen)", "Menciones - Empresa"
+    ]
+    
+    nuevos_resultados = []
+    progreso = st.progress(0, text="Iniciando procesamiento...")
+    
+    for indice, f in enumerate(uploaded_files):
+        progreso.progress(indice / len(uploaded_files), text=f"Procesando: {f.name}...")
         try:
-            df, av, gr = process_dossier(f, rmap, imap)
-            exc = to_excel_from_df(df, FINAL_ORDER, f.name, av, gr)
-            nuevos.append({'nombre': f.name, 'graficas': gr, 'av': av, 'total': len(df),
-                           'excel': exc, 'matched_client': get_client_category(f.name),
-                           'filename': f"SOV_{f.name.replace('.xlsx','')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"})
-        except Exception as e: st.error(f"Error en {f.name}: {e}")
-    pb.progress(1.0, text="✅ Listo")
-    st.session_state['resultados'].extend(nuevos)
+            df, conteo_av, conteo_graf = process_dossier(f, rmap, imap)
+            archivo_procesado = to_excel_from_df(df, FINAL_ORDER, f.name, conteo_av, conteo_graf)
+            
+            nuevos_resultados.append({
+                'nombre': f.name, 
+                'graficas': conteo_graf, 
+                'av': conteo_av, 
+                'total': len(df),
+                'excel': archivo_procesado, 
+                'matched_client': get_client_category(f.name),
+                'filename': f"SOV_{f.name.replace('.xlsx','')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            })
+        except Exception as e:
+            st.error(f"Error procesando {f.name}: {e}")
+            
+    progreso.progress(1.0, text="Procesamiento completado con éxito.")
+    st.session_state['resultados'].extend(nuevos_resultados)
     st.session_state['uploader_key'] += 1
-    st.balloons()
     st.rerun()
 
-st.markdown("")
-
-# ── PASO 3: Resultados ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# PASO 3: Resultados Consolidados
+# ──────────────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="step-block">
   <div class="step-label">
-    <span class="step-num {'done' if tiene_resultados else ''}">{3}</span>
+    <span class="step-num {'done' if tiene_resultados else ''}">3</span>
     <div>
-      <div class="step-title">Resultados y conteo consolidado {'✅' if tiene_resultados else ''}</div>
-      <p class="step-desc">Aquí verá el conteo final con las Notas calculadas automáticamente
-      más la Codificación ingresada en el Paso 1. Copie la columna de números directamente a su plantilla de Excel.</p>
+      <div class="step-title">Resultados y Conteo Consolidado {'' if not tiene_resultados else '✓'}</div>
+      <p class="step-desc">Consulte los indicadores unificados y obtenga la columna ordenada de datos para su reporte.</p>
     </div>
   </div>
 </div>
@@ -769,80 +826,93 @@ st.markdown(f"""
 
 if tiene_resultados:
     resultados = st.session_state['resultados']
-    c1,c2,c3,c4 = st.columns(4)
-    for col, lbl, val in [
-        (c1, "Archivos",          len(resultados)),
-        (c2, "Total registros",   sum(r['total']   for r in resultados)),
-        (c3, "🎬 Audiovisuales",  sum(r['av']      for r in resultados)),
-        (c4, "🗞️ Gráficas",       sum(r['graficas'] for r in resultados)),
-    ]:
-        col.markdown(f'<div class="metric-card"><span class="mv">{val}</span><span class="ml">{lbl}</span></div>',
-                     unsafe_allow_html=True)
-    st.markdown("")
-
-    tab_cons, tab_arch = st.tabs(["📊 Conteo consolidado", "📋 Detalle por archivo"])
-
-    # ── Conteo consolidado ──
-    with tab_cons:
-        listado = [{'filename':r['nombre'],'av_count':r['av'],'grafica_count':r['graficas']} for r in resultados]
-        df_cons = build_consolidated_conteo(listado, st.session_state['manual_codif'])
-
-        if tiene_manual:
-            st.markdown(
-                '<div class="ok-box">✅ El conteo incluye su codificación manual. '
-                'Si modifica los valores en el Paso 1, el conteo se actualizará automáticamente.</div>',
-                unsafe_allow_html=True,
-            )
-
-        col_t, col_n = st.columns([3, 1])
-
-        with col_t:
-            st.markdown("##### Tabla de conteo (40 filas en orden estándar)")
+    
+    # Métricas Globales
+    mc_1, mc_2, mc_3, mc_4 = st.columns(4)
+    mc_1.markdown(f'<div class="metric-card"><span class="mv">{len(resultados)}</span><span class="ml">Dossiers Procesados</span></div>', unsafe_allow_html=True)
+    mc_2.markdown(f'<div class="metric-card"><span class="mv">{sum(r["total"] for r in resultados)}</span><span class="ml">Total de Registros</span></div>', unsafe_allow_html=True)
+    mc_3.markdown(f'<div class="metric-card"><span class="mv">{sum(r["av"] for r in resultados)}</span><span class="ml">Total Audiovisual</span></div>', unsafe_allow_html=True)
+    mc_4.markdown(f'<div class="metric-card"><span class="mv">{sum(r["graficas"] for r in resultados)}</span><span class="ml">Total Gráfico</span></div>', unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Pestañas de Presentación de Resultados
+    pestaña_conteo, pestaña_archivos = st.tabs(["📊 Conteo Unificado", "📋 Detalles por Archivo"])
+    
+    with pestaña_conteo:
+        lista_dossiers = [{'filename': r['nombre'], 'av_count': r['av'], 'grafica_count': r['graficas']} for r in resultados]
+        df_final = build_consolidated_conteo(lista_dossiers, st.session_state['manual_codif'])
+        
+        st.markdown(
+            '<div class="info-box">✅ Conteo actualizado. Los cambios manuales realizados en el paso 1 se ven reflejados de forma inmediata.</div>',
+            unsafe_allow_html=True
+        )
+        
+        col_tabla, col_copia = st.columns([3, 1])
+        
+        with col_tabla:
+            st.markdown("##### Estructura Consolidada (40 Registros)")
+            
+            # Aplicar estilos para destacar filas con valores reales
             st.dataframe(
-                df_cons.style.apply(
-                    lambda col: ['color:#1d4ed8;font-weight:700' if v>0 else 'color:#cbd5e1' for v in col]
+                df_final.style.apply(
+                    lambda col: ['color: #2563eb; font-weight: bold;' if val > 0 else 'color: #94a3b8;' for val in col]
                     if col.name == 'Cantidad' else ['' for _ in col], axis=0
                 ),
-                use_container_width=True, hide_index=True, height=620,
+                use_container_width=True, 
+                hide_index=True, 
+                height=650
             )
-            exc_cons = to_excel_consolidated(df_cons)
+            
+            archivo_conteo_excel = to_excel_consolidated(df_final)
             st.download_button(
-                "📥 Descargar Excel de conteo",
-                data=exc_cons,
-                file_name=f"Conteo_SOV_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                "📥 Descargar Conteo en Excel (.xlsx)",
+                data=archivo_conteo_excel,
+                file_name=f"SOV_Conteo_Final_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_cons", use_container_width=True,
+                use_container_width=True
             )
-
-        with col_n:
-            st.markdown("##### 📋 Columna para copiar")
-            st.caption("Seleccione todo el texto y péguelo directamente en su plantilla de Excel.")
+            
+        with col_copia:
+            st.markdown("##### 📋 Copiar Datos Numéricos")
+            st.caption("Seleccione y copie la columna de valores para pegarla en su plantilla matriz.")
+            
+            valores_linea = "\n".join(df_final["Cantidad"].astype(str).tolist())
             st.text_area(
-                "40 valores en orden estándar:",
-                value="\n".join(df_cons["Cantidad"].astype(str).tolist()),
-                height=580, key="nums_area",
+                "Valores listos para copiar:",
+                value=valores_linea,
+                height=600,
+                key="conteo_copia_rapida"
             )
-
-    # ── Detalle por archivo ──
-    with tab_arch:
-        for r in resultados:
-            st.markdown(
-                f'<div class="file-card"><div class="fn">📄 {r["nombre"]}</div>'
-                + (f'<span class="client-tag">🎯 {r["matched_client"]}</span>'
-                   if r.get("matched_client") else '<span class="warn-tag">⚠️ Cliente no detectado</span>')
-                + '</div>', unsafe_allow_html=True,
+            
+    with pestaña_archivos:
+        for item in resultados:
+            st.markdown(f"""
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+                <div style="font-weight: 600; font-size: 0.88rem; color: #0f172a; margin-bottom: 4px;">📄 {item['nombre']}</div>
+                <div style="font-size: 0.76rem; color: #64748b; margin-bottom: 10px;">
+                    Identificado como: <span style="background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 500;">{item['matched_client'] if item['matched_client'] else 'No Reconocido'}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_det_1, col_det_2, col_det_3, col_det_down = st.columns([1, 1, 1, 2])
+            col_det_1.metric("Gráficos", item['graficas'])
+            col_det_2.metric("Audiovisual", item['av'])
+            col_det_3.metric("Total", item['total'])
+            
+            col_det_down.download_button(
+                "📥 Descargar Dossier Filtrado", 
+                data=item['excel'], 
+                file_name=item['filename'],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_file_{item['nombre']}",
+                use_container_width=True
             )
-            cg, ca, ct, cdl = st.columns([1,1,1,2])
-            cg.metric("Gráficas", r['graficas'])
-            ca.metric("Audiovisuales", r['av'])
-            ct.metric("Total", r['total'])
-            cdl.download_button("📥 Descargar Excel", data=r['excel'], file_name=r['filename'],
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"dl_{r['nombre']}_{r['filename']}", use_container_width=True)
-            st.markdown("")
+            st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid #f1f5f9;'>", unsafe_allow_html=True)
 
 else:
     st.markdown(
-        '<div class="warn-box">⏳ Procese al menos un dossier en el Paso 2 para ver el conteo consolidado aquí.</div>',
-        unsafe_allow_html=True,
+        '<div class="warn-box">⏳ Cargue y procese los dossiers en el Paso 2 para habilitar el reporte final.</div>',
+        unsafe_allow_html=True
     )
