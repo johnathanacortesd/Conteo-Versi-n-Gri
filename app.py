@@ -543,8 +543,6 @@ def process_dossier(dossier_file, rmap, imap):
     url_av   = df.get('URL Nota AV', df.get('Link Nota AV', pd.Series(['']*len(df)))).fillna('').astype(str)
     url_str  = df.get('URL (Streaming - Imagen)', pd.Series(['']*len(df))).fillna('').astype(str)
     
-    # CORRECCIÓN DE ERROR numpy.ndarray object has no attribute replace:
-    # Se genera el arreglo de NumPy y se fuerza a una Serie de Pandas antes de hacer el .replace()
     link_nota_arr = np.where(is_av, url_av.str.replace(r'\.com\.ar','.com.co',regex=True),
                              np.where(is_gr, url_str, ''))
     df['Link Nota'] = pd.Series(link_nota_arr, index=df.index).replace('', np.nan)
@@ -578,6 +576,44 @@ if 'manual_codif' not in st.session_state:
         st.session_state['manual_codif'] = {c: saved_data.get(c, {'av': 0, 'impresos': 0}) for c in UNIQUE_CLIENTS}
     else:
         st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
+
+# Estados para controlar los mensajes de éxito/error del JSON importado sin ciclos de reinicio
+if 'json_loaded_success' not in st.session_state:
+    st.session_state['json_loaded_success'] = False
+if 'json_loaded_error' not in st.session_state:
+    st.session_state['json_loaded_error'] = None
+
+# ==============================================================================
+# FUNCIÓN CALLBACK PARA CARGA DEL JSON (Previene el error de rerun infinito)
+# ==============================================================================
+def on_json_uploaded():
+    uploaded_file = st.session_state.get('json_uploader_sidebar')
+    if uploaded_file is None:
+        st.session_state['json_loaded_success'] = False
+        st.session_state['json_loaded_error'] = None
+        return
+    try:
+        raw_data = uploaded_file.read().decode('utf-8')
+        imported_data = json.loads(raw_data)
+        
+        # Validar y limpiar la estructura importada
+        cleaned_data = {}
+        for c in UNIQUE_CLIENTS:
+            client_data = imported_data.get(c, {'av': 0, 'impresos': 0})
+            cleaned_data[c] = {
+                'av': int(client_data.get('av', 0)),
+                'impresos': int(client_data.get('impresos', 0))
+            }
+        
+        # Guardar en memoria y persistir en disco
+        st.session_state['manual_codif'] = cleaned_data
+        save_local_backup(cleaned_data)
+        
+        st.session_state['json_loaded_success'] = True
+        st.session_state['json_loaded_error'] = None
+    except Exception as e:
+        st.session_state['json_loaded_success'] = False
+        st.session_state['json_loaded_error'] = f"Formato inválido: {str(e)}"
 
 # ==============================================================================
 # CABECERA PRINCIPAL
@@ -630,28 +666,28 @@ with st.sidebar:
         help="Guarde una copia externa para importarla en cualquier momento o equipo."
     )
 
-    # Importación de archivo externo
+    # Importación de archivo externo usando CALLBACK seguro
     st.markdown("**Cargar Respaldo Externo:**")
-    json_up = st.file_uploader(
+    st.file_uploader(
         "Subir archivo .json",
         type=["json"],
         key="json_uploader_sidebar",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        on_change=on_json_uploaded
     )
-    if json_up is not None:
-        try:
-            imported_data = json.loads(json_up.read().decode('utf-8'))
-            st.session_state['manual_codif'] = {c: imported_data.get(c, {'av':0,'impresos':0}) for c in UNIQUE_CLIENTS}
-            save_local_backup(st.session_state['manual_codif'])
-            st.success("Copia de seguridad restaurada de forma exitosa.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al leer el archivo JSON: {e}")
+    
+    # Mostrar estado de la carga de forma controlada
+    if st.session_state['json_loaded_success']:
+        st.success("✅ Copia de seguridad restaurada correctamente.")
+    elif st.session_state['json_loaded_error'] is not None:
+        st.error(f"❌ {st.session_state['json_loaded_error']}")
 
     st.markdown("---")
     if st.button("🗑️ Reiniciar Sesión", type="secondary", use_container_width=True):
         st.session_state['resultados'] = []
         st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
+        st.session_state['json_loaded_success'] = False
+        st.session_state['json_loaded_error'] = None
         save_local_backup(st.session_state['manual_codif'])
         st.session_state['uploader_key'] += 1
         st.rerun()
