@@ -7,6 +7,7 @@ import io
 import re
 import html
 import numpy as np
+import json
 from pathlib import Path
 
 st.set_page_config(page_title="Conteo v2.0", layout="wide")
@@ -58,6 +59,10 @@ CONTEO_TEMPLATE = [
     ("Universidad Tecnológica de Bolívar", "Notas Audiovisuales", "UTB_AN"),
     ("Universidad Tecnológica de Bolívar", "Notas Impresos", "UTB_AN")
 ]
+
+# Lista de clientes únicos (sin duplicar por Tipo de Conteo), preservando el orden.
+# Se usa para la sección de Codificación Manual.
+UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
 
 # Buscar el archivo de configuración con cualquier variante de nombre/mayúsculas
 def find_config_path():
@@ -226,8 +231,14 @@ def build_conteo_df(filename, av_count, grafica_count):
         
     return pd.DataFrame(rows), matched_client
 
-def build_consolidated_conteo(processed_files):
-    """Genera una tabla de conteo acumulando todos los archivos con sus respectivas reglas aplicadas."""
+def build_consolidated_conteo(processed_files, manual_codif=None):
+    """Genera una tabla de conteo acumulando todos los archivos con sus respectivas reglas aplicadas.
+
+    manual_codif: dict opcional {cliente: {'av': int, 'impresos': int}} con valores
+    codificados a mano (notas ya analizadas previamente) que se SUMAN a lo que
+    sale automáticamente de los dossiers para las filas de Codificación.
+    """
+    manual_codif = manual_codif or {}
     client_av = {}
     client_graf = {}
     
@@ -242,6 +253,8 @@ def build_consolidated_conteo(processed_files):
         val = 0
         av_count = client_av.get(client, 0)
         graf_count = client_graf.get(client, 0)
+        manual_av = manual_codif.get(client, {}).get('av', 0) or 0
+        manual_impresos = manual_codif.get(client, {}).get('impresos', 0) or 0
         
         is_replicated_client = client in [
             "Chery 01-18 | |19-31",
@@ -255,9 +268,9 @@ def build_consolidated_conteo(processed_files):
         elif tipo == "Notas Impresos":
             val = graf_count
         elif tipo == "Codificación Audiovisuales":
-            val = av_count if is_replicated_client else 0
+            val = (av_count if is_replicated_client else 0) + manual_av
         elif tipo == "Codificación Impresos":
-            val = graf_count if is_replicated_client else 0
+            val = (graf_count if is_replicated_client else 0) + manual_impresos
             
         rows.append({
             "Cliente / Categoría": client,
@@ -498,6 +511,10 @@ def process_dossier(dossier_file, region_map, internet_map):
 if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0
 
+if 'manual_codif' not in st.session_state:
+    # Valores codificados a mano por cliente: {'av': int, 'impresos': int}
+    st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
+
 st.title("🚀 Conteo v2.0")
 st.markdown("Transforma archivos de entrada al formato estándar de salida con todos los mapeos aplicados.")
 
@@ -576,7 +593,9 @@ if uploaded_dossiers:
 if st.session_state.get('resultados'):
     st.markdown("---")
     
-    tab_archivos, tab_consolidado = st.tabs(["📋 Detalle por Archivo", "📊 Conteo Total Consolidado"])
+    tab_archivos, tab_consolidado, tab_manual = st.tabs([
+        "📋 Detalle por Archivo", "📊 Conteo Total Consolidado", "✏️ Codificación Manual"
+    ])
     
     with tab_archivos:
         col_title, col_clear = st.columns([6, 1])
@@ -623,7 +642,7 @@ if st.session_state.get('resultados'):
                 'grafica_count': r['graficas']
             })
             
-        df_consolidado = build_consolidated_conteo(listado_archivos)
+        df_consolidado = build_consolidated_conteo(listado_archivos, st.session_state['manual_codif'])
         
         # Dividimos en columnas: la tabla visual a la izquierda y el área de copiado rápido numérico a la derecha
         col_table, col_numeric = st.columns([2, 1])
@@ -650,6 +669,67 @@ if st.session_state.get('resultados'):
             
             # Text area interactivo de fácil copiado
             st.text_area("Cantidades en orden (40 valores):", value=raw_numbers_str, height=350, key="raw_numeric_area")
+
+    with tab_manual:
+        st.subheader("✏️ Codificación Manual")
+        st.markdown(
+            "Acá podés ingresar manualmente las cantidades de **Codificación Audiovisuales** "
+            "y **Codificación Impresos** para notas que ya analizaste antes (fuera de los dossiers "
+            "subidos arriba). Estos valores se **suman** a lo que la app calcula automáticamente "
+            "y se reflejan en el Conteo Consolidado y en 'Copiar Datos Numéricos'."
+        )
+
+        with st.form("form_codif_manual"):
+            nuevos_valores = {}
+            for client in UNIQUE_CLIENTS:
+                st.markdown(f"**{client}**")
+                col_av, col_im = st.columns(2)
+                actual = st.session_state['manual_codif'].get(client, {'av': 0, 'impresos': 0})
+                val_av = col_av.number_input(
+                    "Codificación Audiovisuales", min_value=0, step=1,
+                    value=int(actual.get('av', 0)), key=f"manual_av_{client}"
+                )
+                val_im = col_im.number_input(
+                    "Codificación Impresos", min_value=0, step=1,
+                    value=int(actual.get('impresos', 0)), key=f"manual_im_{client}"
+                )
+                nuevos_valores[client] = {'av': val_av, 'impresos': val_im}
+
+            guardar = st.form_submit_button("💾 Guardar valores", type="primary")
+            if guardar:
+                st.session_state['manual_codif'] = nuevos_valores
+                st.success("Valores guardados para esta sesión.")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📤 Respaldo / restauración entre sesiones")
+        st.markdown(
+            "Streamlit no guarda esto en el navegador entre cierres de sesión. "
+            "Descargá un archivo `.json` como respaldo y subilo la próxima vez que entres a la app."
+        )
+
+        col_export, col_import = st.columns(2)
+        with col_export:
+            json_bytes = json.dumps(st.session_state['manual_codif'], ensure_ascii=False, indent=2).encode('utf-8')
+            st.download_button(
+                "⬇️ Descargar codificación manual (.json)",
+                data=json_bytes,
+                file_name=f"codificacion_manual_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                mime="application/json",
+                key="dl_manual_codif"
+            )
+        with col_import:
+            archivo_subido = st.file_uploader("⬆️ Cargar codificación manual (.json)", type=["json"], key="upload_manual_codif")
+            if archivo_subido is not None:
+                try:
+                    data_cargada = json.load(archivo_subido)
+                    # Solo se aceptan claves que correspondan a clientes válidos del template
+                    valores_validados = {c: data_cargada.get(c, {'av': 0, 'impresos': 0}) for c in UNIQUE_CLIENTS}
+                    st.session_state['manual_codif'] = valores_validados
+                    st.success("Codificación manual cargada correctamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"No se pudo leer el archivo: {e}")
 
 # --- Botón principal ---
 can_run = bool(uploaded_dossiers and config_source)
