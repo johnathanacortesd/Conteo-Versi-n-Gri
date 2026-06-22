@@ -539,10 +539,16 @@ def process_dossier(dossier_file, rmap, imap):
         ps = [p.strip() for p in t.split('\n') if p.strip()]
         return '\n\n'.join(ps) if len(ps)>1 else t
     df['Resumen - Aclaracion'] = np.where(is_av, cuerpo, cuerpo.apply(fmt))
+    
     url_av   = df.get('URL Nota AV', df.get('Link Nota AV', pd.Series(['']*len(df)))).fillna('').astype(str)
     url_str  = df.get('URL (Streaming - Imagen)', pd.Series(['']*len(df))).fillna('').astype(str)
-    df['Link Nota'] = np.where(is_av, url_av.str.replace(r'\.com\.ar','.com.co',regex=True),
-                               np.where(is_gr, url_str, '')).replace('', np.nan)
+    
+    # CORRECCIÓN DE ERROR numpy.ndarray object has no attribute replace:
+    # Se genera el arreglo de NumPy y se fuerza a una Serie de Pandas antes de hacer el .replace()
+    link_nota_arr = np.where(is_av, url_av.str.replace(r'\.com\.ar','.com.co',regex=True),
+                             np.where(is_gr, url_str, ''))
+    df['Link Nota'] = pd.Series(link_nota_arr, index=df.index).replace('', np.nan)
+    
     df['Link (Streaming - Imagen)'] = df.get('URL Nota',pd.Series(['']*len(df))).fillna('').astype(str).replace('',np.nan)
     m_av  = df.get('Menciones - Empresa',pd.Series(['']*len(df))).fillna('').astype(str).apply(clean_text)
     m_gr  = df.get('Empresa rel.',       pd.Series(['']*len(df))).fillna('').astype(str).apply(clean_text)
