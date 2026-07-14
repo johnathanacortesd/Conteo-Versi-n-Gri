@@ -256,7 +256,7 @@ textarea {
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# CONSTANTES Y ESTRUCTURA DEL CONTEO (40 Filas en orden específico)
+# CONSTANTES Y ESTRUCTURA DEL CONTEO (36 Filas en orden específico)
 # ==============================================================================
 CONTEO_TEMPLATE = [
     ("Chery 01-18 | |19-31",                          "Codificación Audiovisuales", "ANCHERY"),
@@ -287,10 +287,6 @@ CONTEO_TEMPLATE = [
     ("Nissan, Competencia",                           "Codificación Impresos",      "ANNISSAN"),
     ("Nissan, Competencia",                           "Notas Audiovisuales",        "ANNISSAN"),
     ("Nissan, Competencia",                           "Notas Impresos",             "ANNISSAN"),
-    ("Tigo",                                          "Codificación Audiovisuales", "TIGOAN"),
-    ("Tigo",                                          "Codificación Impresos",      "TIGOAN"),
-    ("Tigo",                                          "Notas Audiovisuales",        "TIGOAN"),
-    ("Tigo",                                          "Notas Impresos",             "TIGOAN"),
     ("Universidad Simón Bolívar",                     "Codificación Audiovisuales", "USIMONAN"),
     ("Universidad Simón Bolívar",                     "Codificación Impresos",      "USIMONAN"),
     ("Universidad Simón Bolívar",                     "Notas Audiovisuales",        "USIMONAN"),
@@ -308,7 +304,6 @@ _CODE_MAP = {
     "acomfevalle": "Comfenalco Valle",
     "anfenavi":    "Federación Nacional de Avicultores de Colombia",
     "fsantafe_an": "Fundación Santa Fe de Bogotá",
-    "tigoan":      "Tigo",
     "usimonan":    "Universidad Simón Bolívar",
     "utb_an":      "Universidad Tecnológica de Bolívar",
 }
@@ -317,7 +312,6 @@ _LEGACY = {
     "Comfenalco Valle":                               ["comfe","comfenalco"],
     "Federación Nacional de Avicultores de Colombia": ["fenavi","avicultores","avicola"],
     "Fundación Santa Fe de Bogotá":                   ["fsant","santa","santafe"],
-    "Tigo":                                           ["tigo"],
     "Universidad Simón Bolívar":                      ["simon","usimon","usim"],
     "Universidad Tecnológica de Bolívar":             ["utb","tecnologica"],
 }
@@ -683,7 +677,24 @@ with st.sidebar:
         st.error(f"❌ {st.session_state['json_loaded_error']}")
 
     st.markdown("---")
-    if st.button("🗑️ Reiniciar Sesión", type="secondary", use_container_width=True):
+    st.markdown("### 🗂️ Notas Analizadas")
+
+    cant_notas_previas = len(st.session_state['resultados'])
+    if cant_notas_previas > 0:
+        st.caption(f"Actualmente hay {cant_notas_previas} dossier(s) procesado(s) en esta sesión.")
+    else:
+        st.caption("No hay dossiers procesados en esta sesión.")
+
+    if st.button("🧹 Borrar Notas Analizadas", type="secondary", use_container_width=True,
+                  disabled=cant_notas_previas == 0,
+                  help="Elimina únicamente los dossiers procesados (Paso 2 y 3). No afecta la codificación manual guardada."):
+        st.session_state['resultados'] = []
+        st.session_state['uploader_key'] += 1
+        st.rerun()
+
+    st.markdown("---")
+    if st.button("🗑️ Reiniciar Sesión", type="secondary", use_container_width=True,
+                  help="Borra tanto los dossiers procesados como la codificación manual guardada."):
         st.session_state['resultados'] = []
         st.session_state['manual_codif'] = {c: {'av': 0, 'impresos': 0} for c in UNIQUE_CLIENTS}
         st.session_state['json_loaded_success'] = False
@@ -722,7 +733,7 @@ with st.expander("✏️ Ver y Modificar Datos Manuales de Codificación", expan
     )
     
     # Botón para ver la guía de orden
-    with st.expander("📖 Estructura del Conteo (40 Filas en Orden Estándar)", expanded=False):
+    with st.expander("📖 Estructura del Conteo (36 Filas en Orden Estándar)", expanded=False):
         rows_html = ""
         for i, (client, tipo, codigo) in enumerate(CONTEO_TEMPLATE, 1):
             hl = "og-row hl" if "Codificación" in tipo else "og-row"
@@ -876,6 +887,13 @@ if tiene_resultados:
     mc_3.markdown(f'<div class="metric-card"><span class="mv">{sum(r["av"] for r in resultados)}</span><span class="ml">Total Audiovisual</span></div>', unsafe_allow_html=True)
     mc_4.markdown(f'<div class="metric-card"><span class="mv">{sum(r["graficas"] for r in resultados)}</span><span class="ml">Total Gráfico</span></div>', unsafe_allow_html=True)
     
+    col_clear_top, _ = st.columns([1, 4])
+    if col_clear_top.button("🧹 Borrar Notas Analizadas", use_container_width=True,
+                             help="Elimina los dossiers procesados que se ven abajo. La codificación manual del Paso 1 no se ve afectada."):
+        st.session_state['resultados'] = []
+        st.session_state['uploader_key'] += 1
+        st.rerun()
+
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Pestañas de Presentación de Resultados
@@ -893,7 +911,7 @@ if tiene_resultados:
         col_tabla, col_copia = st.columns([3, 1])
         
         with col_tabla:
-            st.markdown("##### Estructura Consolidada (40 Registros)")
+            st.markdown("##### Estructura Consolidada (36 Registros)")
             
             # Aplicar estilos para destacar filas con valores reales
             st.dataframe(
