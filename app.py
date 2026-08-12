@@ -374,10 +374,29 @@ def clean_cuerpo(t):
     return t.strip()
 
 def get_client_category(filename):
+    # Nombre original en minúsculas, sin quitar aún el prefijo de día (lo necesitamos para CHERYCHIN)
+    fn_original = Path(filename).stem.lower().strip()
     fn = re.sub(r'^[\d\s\-_]+', '', Path(filename).name.lower()).strip()
     tokens = [t for t in re.split(r'[^a-z0-9]', fn) if t]
     comp = any(t in {"c","com","comp","competencia","competencias","changan"} for t in tokens)
-    
+
+    # ──────────────────────────────────────────────────────────────────
+    # Chery · usuario CHERYCHIN
+    # Patrón de archivo: "{día} CHERYCHIN m"   -> marca (Chery 01-18 | |19-31)
+    #                     "{día} CHERYCHIN com" -> competencia (Chery - Changan, Competencias)
+    # El "día" es el número inicial del nombre del archivo y no afecta la
+    # identificación del cliente, solo indica la fecha del dossier.
+    # ──────────────────────────────────────────────────────────────────
+    if "cherychin" in fn_original:
+        m = re.search(r'cherychin\s*[-_]?\s*([a-z]+)', fn_original)
+        sufijo = m.group(1) if m else ""
+        if sufijo.startswith("com"):
+            return "Chery - Changan, Competencias"
+        if sufijo.startswith("m"):
+            return "Chery 01-18 | |19-31"
+        # Si no se detecta un sufijo claro, se usa la lógica genérica de competencia
+        return "Chery - Changan, Competencias" if comp else "Chery 01-18 | |19-31"
+
     if "anchery" in fn: 
         return "Chery - Changan, Competencias" if comp else "Chery 01-18 | |19-31"
     if "annissan" in fn: 
