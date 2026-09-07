@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook, Workbook
+from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import datetime
 import io
 import re
-import html
-import numpy as np
 import json
 from pathlib import Path
+
+from dossier import load_config, process_dossier
 
 # ==============================================================================
 # CONFIGURACIÓN DE PÁGINA
@@ -347,32 +347,6 @@ def find_config_path():
 
 CONFIG_PATH = find_config_path()
 
-def extract_link_from_cell(cell):
-    return cell.hyperlink.target if cell.hyperlink and cell.hyperlink.target else None
-
-def convert_html_entities(text):
-    if not isinstance(text, str): return text
-    text = html.unescape(text)
-    for entity, char in {'&#xF3;':'ó','&#xE1;':'á','&#xE9;':'é','&#xED;':'í','&#xFA;':'ú',
-                          '&#xF1;':'ñ','&#xDC;':'Ü','&#xFC;':'ü','&#xC1;':'Á','&#xC9;':'É',
-                          '&#xCD;':'Í','&#xD3;':'Ó','&#xDA;':'Ú','&#xD1;':'Ñ','&#xC7;':'Ç','&#xE7;':'ç'}.items():
-        text = text.replace(entity, char)
-    text = re.sub(r'&#x([0-9A-Fa-f]+);', lambda m: chr(int(m.group(1),16)), text)
-    text = re.sub(r'&#(\d+);',           lambda m: chr(int(m.group(1))),    text)
-    for b,g in {'\u201c':'"','\u201d':'"','\u2018':"'",'\u2019':"'",'Â':'','â':'','€':'','™':''}.items():
-        text = text.replace(b, g)
-    return text
-
-def clean_text(t):
-    return convert_html_entities(t).strip() if isinstance(t, str) else t
-
-def clean_cuerpo(t):
-    if not isinstance(t, str) or not t.strip(): return t
-    t = convert_html_entities(t)
-    t = re.sub(r'<br\s*/?>', '\n', t, flags=re.IGNORECASE)
-    t = re.sub(r'<[^>]+>', '', t)
-    return t.strip()
-
 def get_client_category(filename):
     # Nombre original en minúsculas, sin quitar aún el prefijo de día (lo necesitamos para CHERYCHIN)
     fn_original = Path(filename).stem.lower().strip()
@@ -497,81 +471,6 @@ def to_excel_from_df(df, final_order, filename, av_count, grafica_count):
     for col in ws2.columns:
         ws2.column_dimensions[col[0].column_letter].width = max(max(len(str(c.value or '')) for c in col)+4, 14)
     wb.save(out); out.seek(0); return out.getvalue()
-
-def load_config(src):
-    sheets = pd.read_excel(src, sheet_name=None, engine='openpyxl')
-    rmap = pd.Series(sheets['Regiones'].iloc[:,1].values,
-                     index=sheets['Regiones'].iloc[:,0].astype(str).str.lower().str.strip()).to_dict()
-    imap = pd.Series(sheets['Internet'].iloc[:,1].values,
-                     index=sheets['Internet'].iloc[:,0].astype(str).str.lower().str.strip()).to_dict()
-    return rmap, imap
-
-def process_dossier(dossier_file, rmap, imap):
-    wb = load_workbook(dossier_file); sheet = wb.active
-    headers = [c.value for c in sheet[1] if c.value is not None]
-    rows = []
-    for row in sheet.iter_rows(min_row=2):
-        if all(c.value is None for c in row): continue
-        rd = dict(zip(headers, [c.value for c in row[:len(headers)]]))
-        for lc in ['URL Nota AV','URL (Streaming - Imagen)','URL Nota','Link Nota AV','Link (Streaming - Imagen)']:
-            if lc in headers:
-                idx = headers.index(lc)
-                if idx < len(row):
-                    ext = extract_link_from_cell(row[idx])
-                    if ext: rd[lc] = ext
-        rows.append(rd)
-    df = pd.DataFrame(rows)
-    tmap = {'online':'Internet','internet':'Internet','diario':'Prensa','am':'Radio','fm':'Radio',
-            'aire':'Televisión','cable':'Televisión','revista':'Revistas','revistas':'Revistas'}
-    df['Tipo de Medio'] = df['Tipo de Medio'].astype(str).str.lower().str.strip().map(tmap).fillna(df['Tipo de Medio'].astype(str).str.strip())
-    is_av = df['Tipo de Medio'].isin(['Radio','Televisión'])
-    is_gr = df['Tipo de Medio'].isin(['Prensa','Internet','Revistas'])
-    is_in = df['Tipo de Medio'] == 'Internet'
-    df.loc[is_in,'Medio'] = df.loc[is_in,'Medio'].astype(str).str.lower().str.strip().map(imap).fillna(df.loc[is_in,'Medio'])
-    df['Región'] = df['Medio'].astype(str).str.lower().str.strip().map(rmap)
-    df['ID Noticia']    = df.get('NoticiaId', pd.Series(dtype=str))
-    df['Fecha']         = pd.to_datetime(df.get('Fecha',pd.Series(dtype=str)), dayfirst=True, errors='coerce').dt.normalize()
-    df['Hora']          = df.get('Hora', pd.Series(dtype=str))
-    for c in ['Sección - Programa','Título','Autor - Conductor']:
-        df[c] = df.get(c, pd.Series(dtype=str)).astype(str).apply(clean_text)
-    df['Nro. Pagina']   = df.get('Nro. Pagina', pd.Series(dtype=str))
-    df['Dimensión']     = df.get('Dimensioncm2', pd.Series(dtype=str))
-    df['Duración - Nro. Caracteres'] = df.get('Duración - Nro. Caracteres', pd.Series(dtype=str))
-    df.loc[is_av,'Dimensión'] = df.loc[is_av,'Duración - Nro. Caracteres']
-    df.loc[is_av,'Duración - Nro. Caracteres'] = 0
-    df['CPE'] = np.where(is_av, df.get('CPE',pd.Series([np.nan]*len(df))),
-                         np.where(is_gr, df.get('Valor de Nota',pd.Series([np.nan]*len(df))), np.nan))
-    df['Tier']     = df.get('Tier', pd.Series(dtype=str))
-    df['Audiencia'] = df.get('Audiencia', pd.Series(dtype=str))
-    df['Tono']     = df.get('Tono', pd.Series(dtype=str)).astype(str).apply(clean_text)
-    df['Tema']     = df.get('Tematica', pd.Series(dtype=str)).astype(str).apply(clean_text)
-    df['Temas Generales - Tema'] = df.get('Temas Generales - Tema', pd.Series(dtype=str)).astype(str).apply(clean_text)
-    cuerpo = df.get('CuerpoEs',pd.Series(['']*len(df))).astype(str).apply(clean_cuerpo)
-    def fmt(t):
-        if not isinstance(t,str) or not t.strip(): return t
-        ps = [p.strip() for p in t.split('\n') if p.strip()]
-        return '\n\n'.join(ps) if len(ps)>1 else t
-    df['Resumen - Aclaracion'] = np.where(is_av, cuerpo, cuerpo.apply(fmt))
-    
-    url_av   = df.get('URL Nota AV', df.get('Link Nota AV', pd.Series(['']*len(df)))).fillna('').astype(str)
-    url_str  = df.get('URL (Streaming - Imagen)', pd.Series(['']*len(df))).fillna('').astype(str)
-    
-    link_nota_arr = np.where(is_av, url_av.str.replace(r'\.com\.ar','.com.co',regex=True),
-                             np.where(is_gr, url_str, ''))
-    df['Link Nota'] = pd.Series(link_nota_arr, index=df.index).replace('', np.nan)
-    
-    df['Link (Streaming - Imagen)'] = df.get('URL Nota',pd.Series(['']*len(df))).fillna('').astype(str).replace('',np.nan)
-    m_av  = df.get('Menciones - Empresa',pd.Series(['']*len(df))).fillna('').astype(str).apply(clean_text)
-    m_gr  = df.get('Empresa rel.',       pd.Series(['']*len(df))).fillna('').astype(str).apply(clean_text)
-    df['Menciones - Empresa'] = np.where(is_av, m_av, np.where(is_gr, m_gr, m_av))
-    rows_exp = []
-    for _, row in df.iterrows():
-        menc = [m.strip() for m in str(row['Menciones - Empresa']).split(';') if m.strip()]
-        if not menc: rows_exp.append(row.to_dict())
-        else:
-            for m in menc: nr=row.to_dict(); nr['Menciones - Empresa']=m; rows_exp.append(nr)
-    df = pd.DataFrame(rows_exp).reset_index(drop=True)
-    return df, int(df['Tipo de Medio'].isin(['Radio','Televisión']).sum()), int(df['Tipo de Medio'].isin(['Prensa','Internet','Revistas']).sum())
 
 # ==============================================================================
 # INICIALIZACIÓN DE ESTADOS
@@ -844,7 +743,7 @@ if ejecutar:
     try:
         rmap, imap = load_config(config_source)
     except Exception as e:
-        st.error(f"Error al abrir el archivo de configuración: {e}")
+        st.error(f"No se pudo abrir el archivo de configuración: {e}")
         st.stop()
 
     FINAL_ORDER = [
@@ -874,7 +773,7 @@ if ejecutar:
                 'filename': f"SOV_{f.name.replace('.xlsx','')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
             })
         except Exception as e:
-            st.error(f"Error procesando {f.name}: {e}")
+            st.error(f"No se pudo procesar {f.name}: {e}")
             
     progreso.progress(1.0, text="Procesamiento completado con éxito.")
     st.session_state['resultados'].extend(nuevos_resultados)
