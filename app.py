@@ -256,7 +256,7 @@ textarea {
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# CONSTANTES Y ESTRUCTURA DEL CONTEO (36 Filas en orden específico)
+# CONSTANTES Y ESTRUCTURA DEL CONTEO (Filas en orden específico)
 # ==============================================================================
 CONTEO_TEMPLATE = [
     ("Chery 01-18 | |19-31",                          "Codificación Audiovisuales", "ANCHERY"),
@@ -295,6 +295,14 @@ CONTEO_TEMPLATE = [
     ("Universidad Tecnológica de Bolívar",            "Codificación Impresos",      "UTB_AN"),
     ("Universidad Tecnológica de Bolívar",            "Notas Audiovisuales",        "UTB_AN"),
     ("Universidad Tecnológica de Bolívar",            "Notas Impresos",             "UTB_AN"),
+    ("CFESINT",                                       "Codificación Audiovisuales", "CFESINT"),
+    ("CFESINT",                                       "Codificación Impresos",      "CFESINT"),
+    ("CFESINT",                                       "Notas Audiovisuales",        "CFESINT"),
+    ("CFESINT",                                       "Notas Impresos",             "CFESINT"),
+    ("ANUNISALLE",                                    "Codificación Audiovisuales", "ANUNISALLE"),
+    ("ANUNISALLE",                                    "Codificación Impresos",      "ANUNISALLE"),
+    ("ANUNISALLE",                                    "Notas Audiovisuales",        "ANUNISALLE"),
+    ("ANUNISALLE",                                    "Notas Impresos",             "ANUNISALLE"),
 ]
 
 UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
@@ -303,6 +311,8 @@ REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "
 _CODE_MAP = {
     "acomfevalle": "Comfenalco Valle",
     "anfenavi":    "Federación Nacional de Avicultores de Colombia",
+    "cfesint":     "CFESINT",
+    "anunisalle":  "ANUNISALLE",
     "fsantafe_an": "Fundación Santa Fe de Bogotá",
     "usimonan":    "Universidad Simón Bolívar",
     "utb_an":      "Universidad Tecnológica de Bolívar",
@@ -651,7 +661,7 @@ with st.expander("✏️ Ver y Modificar Datos Manuales de Codificación", expan
     )
     
     # Botón para ver la guía de orden
-    with st.expander("📖 Estructura del Conteo (36 Filas en Orden Estándar)", expanded=False):
+    with st.expander(f"📖 Estructura del Conteo ({len(CONTEO_TEMPLATE)} Filas en Orden Estándar)", expanded=False):
         rows_html = ""
         for i, (client, tipo, codigo) in enumerate(CONTEO_TEMPLATE, 1):
             hl = "og-row hl" if "Codificación" in tipo else "og-row"
@@ -829,7 +839,7 @@ if tiene_resultados:
         col_tabla, col_copia = st.columns([3, 1])
         
         with col_tabla:
-            st.markdown("##### Estructura Consolidada (36 Registros)")
+            st.markdown(f"##### Estructura Consolidada ({len(df_final)} Registros)")
             
             # Aplicar estilos para destacar filas con valores reales
             st.dataframe(
@@ -862,6 +872,25 @@ if tiene_resultados:
                 height=600,
                 key="conteo_copia_rapida"
             )
+
+        # ── Casillas de copiado rápido por cliente (CFESINT / ANUNISALLE) ──
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 📋 Copiado rápido por cliente")
+        st.caption(
+            "Casillas separadas para CFESINT y ANUNISALLE. Use el botón de copiar de cada casilla "
+            "para pegar los 4 valores en su plantilla. Orden: Codificación Audiovisuales, "
+            "Codificación Impresos, Notas Audiovisuales, Notas Impresos."
+        )
+
+        col_cfe, col_uni = st.columns(2)
+        for _col, _cli in ((col_cfe, "CFESINT"), (col_uni, "ANUNISALLE")):
+            with _col:
+                st.markdown(f"**{_cli}**")
+                _vals = (
+                    df_final.loc[df_final["Cliente / Categoría"] == _cli, "Cantidad"]
+                    .astype(str).tolist()
+                )
+                st.code("\n".join(_vals), language=None)
             
     with pestaña_archivos:
         for item in resultados:
