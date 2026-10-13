@@ -308,6 +308,10 @@ CONTEO_TEMPLATE = [
 UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
 REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia"}
 
+# Clientes nuevos con casilla de copiado separada: no van en
+# "Valores listos para copiar" (que conserva los 36 valores originales).
+CLIENTES_COPIA_SEPARADA = ("CFESINT", "ANUNISALLE")
+
 _CODE_MAP = {
     "acomfevalle": "Comfenalco Valle",
     "anfenavi":    "Federación Nacional de Avicultores de Colombia",
@@ -865,7 +869,11 @@ if tiene_resultados:
             st.markdown("##### 📋 Copiar Datos Numéricos")
             st.caption("Seleccione y copie la columna de valores para pegarla en su plantilla matriz.")
             
-            valores_linea = "\n".join(df_final["Cantidad"].astype(str).tolist())
+            # Solo los 36 valores originales, en el mismo orden de siempre.
+            valores_linea = "\n".join(
+                df_final.loc[~df_final["Cliente / Categoría"].isin(CLIENTES_COPIA_SEPARADA), "Cantidad"]
+                .astype(str).tolist()
+            )
             st.text_area(
                 "Valores listos para copiar:",
                 value=valores_linea,
@@ -877,13 +885,13 @@ if tiene_resultados:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 📋 Copiado rápido por cliente")
         st.caption(
-            "Casillas separadas para CFESINT y ANUNISALLE. Use el botón de copiar de cada casilla "
-            "para pegar los 4 valores en su plantilla. Orden: Codificación Audiovisuales, "
-            "Codificación Impresos, Notas Audiovisuales, Notas Impresos."
+            f"Casillas separadas para {', '.join(CLIENTES_COPIA_SEPARADA)}. Use el botón de copiar "
+            "de cada casilla para pegar los 4 valores en su plantilla. Orden: Codificación "
+            "Audiovisuales, Codificación Impresos, Notas Audiovisuales, Notas Impresos."
         )
 
-        col_cfe, col_uni = st.columns(2)
-        for _col, _cli in ((col_cfe, "CFESINT"), (col_uni, "ANUNISALLE")):
+        cols_sep = st.columns(len(CLIENTES_COPIA_SEPARADA))
+        for _col, _cli in zip(cols_sep, CLIENTES_COPIA_SEPARADA):
             with _col:
                 st.markdown(f"**{_cli}**")
                 _vals = (
