@@ -259,14 +259,14 @@ textarea {
 # CONSTANTES Y ESTRUCTURA DEL CONTEO (Filas en orden específico)
 # ==============================================================================
 CONTEO_TEMPLATE = [
-    ("Chery 01-18 | |19-31",                          "Codificación Audiovisuales", "ANCHERY"),
-    ("Chery 01-18 | |19-31",                          "Codificación Impresos",      "ANCHERY"),
-    ("Chery 01-18 | |19-31",                          "Notas Audiovisuales",        "ANCHERY"),
-    ("Chery 01-18 | |19-31",                          "Notas Impresos",             "ANCHERY"),
-    ("Chery - Changan, Competencias",                 "Codificación Audiovisuales", "ANCHERY"),
-    ("Chery - Changan, Competencias",                 "Codificación Impresos",      "ANCHERY"),
-    ("Chery - Changan, Competencias",                 "Notas Audiovisuales",        "ANCHERY"),
-    ("Chery - Changan, Competencias",                 "Notas Impresos",             "ANCHERY"),
+    ("Chery 01-18 | |19-31",                          "Codificación Audiovisuales", "CHERYCHIN"),
+    ("Chery 01-18 | |19-31",                          "Codificación Impresos",      "CHERYCHIN"),
+    ("Chery 01-18 | |19-31",                          "Notas Audiovisuales",        "CHERYCHIN"),
+    ("Chery 01-18 | |19-31",                          "Notas Impresos",             "CHERYCHIN"),
+    ("Chery - Changan, Competencias",                 "Codificación Audiovisuales", "CHERYCHIN"),
+    ("Chery - Changan, Competencias",                 "Codificación Impresos",      "CHERYCHIN"),
+    ("Chery - Changan, Competencias",                 "Notas Audiovisuales",        "CHERYCHIN"),
+    ("Chery - Changan, Competencias",                 "Notas Impresos",             "CHERYCHIN"),
     ("Comfenalco Valle",                              "Codificación Audiovisuales", "ACOMFEVALLE"),
     ("Comfenalco Valle",                              "Codificación Impresos",      "ACOMFEVALLE"),
     ("Comfenalco Valle",                              "Notas Audiovisuales",        "ACOMFEVALLE"),
@@ -306,7 +306,10 @@ CONTEO_TEMPLATE = [
 ]
 
 UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
-REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia"}
+# Clientes cuyas noticias ya vienen clasificadas en el dossier: su
+# codificación se cuenta automáticamente igual que las notas procesadas
+# (además de cualquier cantidad manual extra del Paso 1).
+REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia", "CFESINT", "ANUNISALLE"}
 
 # Clientes nuevos con casilla de copiado separada: no van en
 # "Valores listos para copiar" (que conserva los 36 valores originales).
@@ -658,8 +661,9 @@ st.markdown(f"""
 
 with st.expander("✏️ Ver y Modificar Datos Manuales de Codificación", expanded=not tiene_manual):
     st.markdown(
-        '<div class="warn-box">⚠️ <strong>Importante:</strong> Para los clientes <strong>Chery</strong> y <strong>Nissan</strong>, '
-        'el conteo automático ya incluye su codificación en base al archivo procesado. Registre cantidades manuales adicionales aquí solo si tiene notas '
+        '<div class="warn-box">⚠️ <strong>Importante:</strong> Para los clientes <strong>Chery</strong>, <strong>Nissan</strong>, '
+        '<strong>CFESINT</strong> y <strong>ANUNISALLE</strong>, el conteo automático ya incluye su codificación en base al archivo procesado '
+        '(sus noticias ya vienen clasificadas). Registre cantidades manuales adicionales aquí solo si tiene notas '
         'por fuera de los dossiers.</div>',
         unsafe_allow_html=True
     )
@@ -881,24 +885,54 @@ if tiene_resultados:
                 key="conteo_copia_rapida"
             )
 
-        # ── Casillas de copiado rápido por cliente (CFESINT / ANUNISALLE) ──
+        # ── Tabla separada de copiado: CFESINT y ANUNISALLE ──
+        # Tabla DIFERENTE a la principal: estos dos clientes no van en
+        # "Valores listos para copiar"; tienen su propia tabla y su propia
+        # casilla con los 8 valores en orden (CFESINT x4, ANUNISALLE x4).
+        df_separada = df_final.loc[
+            df_final["Cliente / Categoría"].isin(CLIENTES_COPIA_SEPARADA)
+        ].reset_index(drop=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 📋 Copiado rápido por cliente")
+        st.markdown("##### 🧾 Conteo separado: CFESINT y ANUNISALLE")
         st.caption(
-            f"Casillas separadas para {', '.join(CLIENTES_COPIA_SEPARADA)}. Use el botón de copiar "
-            "de cada casilla para pegar los 4 valores en su plantilla. Orden: Codificación "
-            "Audiovisuales, Codificación Impresos, Notas Audiovisuales, Notas Impresos."
+            "Tabla diferente a la principal, solo para estos dos clientes. "
+            "Sus noticias ya vienen clasificadas: la codificación se cuenta "
+            "automáticamente igual que las notas procesadas."
         )
 
-        cols_sep = st.columns(len(CLIENTES_COPIA_SEPARADA))
-        for _col, _cli in zip(cols_sep, CLIENTES_COPIA_SEPARADA):
-            with _col:
-                st.markdown(f"**{_cli}**")
-                _vals = (
-                    df_final.loc[df_final["Cliente / Categoría"] == _cli, "Cantidad"]
-                    .astype(str).tolist()
-                )
-                st.code("\n".join(_vals), language=None)
+        col_tabla_sep, col_copia_sep = st.columns([3, 1])
+
+        with col_tabla_sep:
+            st.dataframe(
+                df_separada.style.apply(
+                    lambda col: ['color: #2563eb; font-weight: bold;' if val > 0 else 'color: #94a3b8;' for val in col]
+                    if col.name == 'Cantidad' else ['' for _ in col], axis=0
+                ),
+                use_container_width=True,
+                hide_index=True,
+                height=320
+            )
+
+            archivo_conteo_sep = to_excel_consolidated(df_separada)
+            st.download_button(
+                "📥 Descargar Conteo Separado en Excel (.xlsx)",
+                data=archivo_conteo_sep,
+                file_name=f"SOV_Conteo_Separado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+        with col_copia_sep:
+            st.markdown("##### 📋 Copiar Datos (separados)")
+            st.caption("Los 8 valores en orden: CFESINT (4) y ANUNISALLE (4).")
+            valores_sep = "\n".join(df_separada["Cantidad"].astype(str).tolist())
+            st.text_area(
+                "Valores separados para copiar:",
+                value=valores_sep,
+                height=320,
+                key="conteo_copia_separada"
+            )
             
     with pestaña_archivos:
         for item in resultados:
