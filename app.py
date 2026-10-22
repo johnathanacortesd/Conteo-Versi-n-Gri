@@ -885,54 +885,48 @@ if tiene_resultados:
                 key="conteo_copia_rapida"
             )
 
-        # ── Tabla separada de copiado: CFESINT y ANUNISALLE ──
-        # Tabla DIFERENTE a la principal: estos dos clientes no van en
-        # "Valores listos para copiar"; tienen su propia tabla y su propia
-        # casilla con los 8 valores en orden (CFESINT x4, ANUNISALLE x4).
-        df_separada = df_final.loc[
-            df_final["Cliente / Categoría"].isin(CLIENTES_COPIA_SEPARADA)
-        ].reset_index(drop=True)
-
+        # ── Tablas separadas de copiado: CFESINT y ANUNISALLE ──
+        # Cada cliente va SEPARADO, con su propia tabla y su propia casilla
+        # de copiado (4 valores). No se unen en una sola tabla ni van en
+        # "Valores listos para copiar" de la tabla principal.
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🧾 Conteo separado: CFESINT y ANUNISALLE")
+        st.markdown("##### 🧾 Conteo separado por cliente")
         st.caption(
-            "Tabla diferente a la principal, solo para estos dos clientes. "
-            "Sus noticias ya vienen clasificadas: la codificación se cuenta "
-            "automáticamente igual que las notas procesadas."
+            "Cada cliente tiene su propia tabla y su propia casilla de copiado, "
+            "sin unirse con el otro. Sus noticias ya vienen clasificadas: la "
+            "codificación se cuenta automáticamente igual que las notas procesadas."
         )
 
-        col_tabla_sep, col_copia_sep = st.columns([3, 1])
-
-        with col_tabla_sep:
-            st.dataframe(
-                df_separada.style.apply(
-                    lambda col: ['color: #2563eb; font-weight: bold;' if val > 0 else 'color: #94a3b8;' for val in col]
-                    if col.name == 'Cantidad' else ['' for _ in col], axis=0
-                ),
-                use_container_width=True,
-                hide_index=True,
-                height=320
-            )
-
-            archivo_conteo_sep = to_excel_consolidated(df_separada)
-            st.download_button(
-                "📥 Descargar Conteo Separado en Excel (.xlsx)",
-                data=archivo_conteo_sep,
-                file_name=f"SOV_Conteo_Separado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-
-        with col_copia_sep:
-            st.markdown("##### 📋 Copiar Datos (separados)")
-            st.caption("Los 8 valores en orden: CFESINT (4) y ANUNISALLE (4).")
-            valores_sep = "\n".join(df_separada["Cantidad"].astype(str).tolist())
-            st.text_area(
-                "Valores separados para copiar:",
-                value=valores_sep,
-                height=320,
-                key="conteo_copia_separada"
-            )
+        cols_sep = st.columns(len(CLIENTES_COPIA_SEPARADA))
+        for _col, _cli in zip(cols_sep, CLIENTES_COPIA_SEPARADA):
+            with _col:
+                st.markdown(f"**{_cli}**")
+                _df_cli = df_final.loc[
+                    df_final["Cliente / Categoría"] == _cli
+                ].reset_index(drop=True)
+                st.dataframe(
+                    _df_cli.style.apply(
+                        lambda col: ['color: #2563eb; font-weight: bold;' if val > 0 else 'color: #94a3b8;' for val in col]
+                        if col.name == 'Cantidad' else ['' for _ in col], axis=0
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=220
+                )
+                st.text_area(
+                    f"Valores de {_cli} para copiar:",
+                    value="\n".join(_df_cli["Cantidad"].astype(str).tolist()),
+                    height=160,
+                    key=f"conteo_copia_{_cli}"
+                )
+                st.download_button(
+                    f"📥 Descargar {_cli} en Excel (.xlsx)",
+                    data=to_excel_consolidated(_df_cli),
+                    file_name=f"SOV_Conteo_{_cli}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key=f"dl_sep_{_cli}"
+                )
             
     with pestaña_archivos:
         for item in resultados:
