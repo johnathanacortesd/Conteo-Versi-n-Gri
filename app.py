@@ -309,7 +309,10 @@ UNIQUE_CLIENTS = list(dict.fromkeys(c for c, _, _ in CONTEO_TEMPLATE))
 # Clientes cuyas noticias ya vienen clasificadas en el dossier: su
 # codificación se cuenta automáticamente igual que las notas procesadas
 # (además de cualquier cantidad manual extra del Paso 1).
-REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia", "CFESINT", "ANUNISALLE"}
+# CFESINT y ANUNISALLE NO van aquí: su codificación es solo la manual del
+# Paso 1 (si no se registra, queda en 0) y las notas salen del xlsx; no se
+# duplica la data de notas en codificación.
+REPLICATED_CLIENTS = {"Chery 01-18 | |19-31", "Chery - Changan, Competencias", "Nissan", "Nissan, Competencia"}
 
 # Clientes nuevos con casilla de copiado separada: no van en
 # "Valores listos para copiar" (que conserva los 36 valores originales).
@@ -661,9 +664,8 @@ st.markdown(f"""
 
 with st.expander("✏️ Ver y Modificar Datos Manuales de Codificación", expanded=not tiene_manual):
     st.markdown(
-        '<div class="warn-box">⚠️ <strong>Importante:</strong> Para los clientes <strong>Chery</strong>, <strong>Nissan</strong>, '
-        '<strong>CFESINT</strong> y <strong>ANUNISALLE</strong>, el conteo automático ya incluye su codificación en base al archivo procesado '
-        '(sus noticias ya vienen clasificadas). Registre cantidades manuales adicionales aquí solo si tiene notas '
+        '<div class="warn-box">⚠️ <strong>Importante:</strong> Para los clientes <strong>Chery</strong> y <strong>Nissan</strong>, '
+        'el conteo automático ya incluye su codificación en base al archivo procesado. Registre cantidades manuales adicionales aquí solo si tiene notas '
         'por fuera de los dossiers.</div>',
         unsafe_allow_html=True
     )
@@ -893,8 +895,9 @@ if tiene_resultados:
         st.markdown("##### 🧾 Conteo separado por cliente")
         st.caption(
             "Cada cliente tiene su propia tabla y su propia casilla de copiado, "
-            "sin unirse con el otro. Sus noticias ya vienen clasificadas: la "
-            "codificación se cuenta automáticamente igual que las notas procesadas."
+            "sin unirse con el otro. Arriba va la codificación que registres en "
+            "el Paso 1 (manual; si no registras, queda en 0) y abajo las notas "
+            "que salen de los xlsx procesados."
         )
 
         cols_sep = st.columns(len(CLIENTES_COPIA_SEPARADA))
